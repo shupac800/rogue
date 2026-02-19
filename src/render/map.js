@@ -1,48 +1,131 @@
 /**
  * @module render/map
- * Renders the dungeon map into a blessed box widget.
+ * Renders the dungeon map directly into blessed's screen cell buffer.
+ *
+ * We write to screen.lines[y][x] = [attr, char] instead of using
+ * box.setContent(), because blessed's tagged-string parser converts content
+ * through a binary (latin-1) buffer internally, silently dropping any
+ * character above U+00FF — which includes all Unicode box-drawing characters.
  */
 
 import { TILE_CHAR, TILE } from '../dungeon/tiles.js';
 
 /**
- * Return the blessed-tagged string for a single map cell.
- * Walls are always gray; other visible tiles use the box default (white).
- * Visited-but-not-visible tiles are dimmed. Unseen tiles are blank.
- * @param {{type:number,visible:boolean,visited:boolean}} cell
- * @param {boolean} isPlayer - True when the player occupies this cell.
- * @returns {string}
+ * Packed cell attribute constants for blessed's screen cell format.
+ * Encoding: (bold << 18) | ((fg_index + 1) << 9) | (bg_index + 1)
+ * 0 in either field means "terminal default". Explicit colors: 0=black,
+ * 3=yellow, 7=white, 8=gray (bright-black).
+ * @type {Object.<string,number>}
  */
-function cellStr(cell, isPlayer) {
-  if (isPlayer) return '{bold}{yellow-fg}@{/yellow-fg}{/bold}';
-  if (!cell.visited && !cell.visible) return ' ';
+const ATTR = {
+  WALL:   (7 << 9) | 0,              // white fg (7), black bg (0)
+  FLOOR:  (7 << 9) | 0,              // white fg (7), black bg (0)
+  DOOR:   (3 << 9) | 0,              // yellow fg (3), black bg (0)
+  STAIRS: (3 << 9) | 0,              // yellow fg (3), black bg (0)
+  PLAYER: (1 << 18) | (3 << 9) | 0,  // bold + yellow fg (3), black bg
+  HIDDEN: (0x1ff << 9) | 0,           // terminal default fg, black bg
+};
 
-  const ch = TILE_CHAR[cell.type] ?? ' ';
+/** Box-drawing character lookup: key is 'UDLR' (1=WALL neighbor, 0=other). */
+const BOX_CHAR = {
+  '0000': '#',
+  '1000': '│', '0100': '│', '1100': '│',
+  '0010': '─', '0001': '─', '0011': '─',
+  '1001': '└', '1010': '┘', '0101': '┌', '0110': '┐',
+  '1101': '├', '1110': '┤', '0111': '┬', '1011': '┴',
+  '1111': '┼',
+};
 
-  if (!cell.visible) return `{gray-fg}${ch}{/gray-fg}`;
-  if (cell.type === TILE.WALL) return `{gray-fg}${ch}{/gray-fg}`;
-  if (cell.type === TILE.STAIRS_UP || cell.type === TILE.STAIRS_DOWN) {
-    return `{yellow-fg}${ch}{/yellow-fg}`;
-  }
-  return ch; // floor, corridor, door — use box default (white)
+/**
+ * Return the tile type at (x, y), or TILE.VOID for out-of-bounds.
+ * @param {Array} map
+ * @param {number} x
+ * @param {number} y
+ * @returns {number}
+ */
+function typeAt(map, x, y) {
+  if (y < 0 || y >= map.length || x < 0 || x >= map[0].length) return TILE.VOID;
+  return map[y][x].type;
 }
 
 /**
- * Render the full dungeon map into a blessed box.
- * Builds one string per row and sets it as the box content.
- * @param {import('blessed').Widgets.BoxElement} box
+ * Return true when the tile type is open room interior.
+ * @param {number} type
+ * @returns {boolean}
+ */
+function isRoomInterior(type) {
+  return type === TILE.FLOOR || type === TILE.STAIRS_UP || type === TILE.STAIRS_DOWN;
+}
+
+/**
+ * Select the box-drawing character for a WALL tile based on cardinal WALL neighbors.
+ * @param {Array} map
+ * @param {number} x
+ * @param {number} y
+ * @returns {string}
+ */
+function wallBoxChar(map, x, y) {
+  const u = typeAt(map, x, y - 1) === TILE.WALL ? 1 : 0;
+  const d = typeAt(map, x, y + 1) === TILE.WALL ? 1 : 0;
+  const l = typeAt(map, x - 1, y) === TILE.WALL ? 1 : 0;
+  const r = typeAt(map, x + 1, y) === TILE.WALL ? 1 : 0;
+  return BOX_CHAR[`${u}${d}${l}${r}`] ?? '#';
+}
+
+/**
+ * Return the display character for a WALL tile.
+ * Checks all 8 neighbors (including diagonals) to catch room corners.
+ * @param {Array} map
+ * @param {number} x
+ * @param {number} y
+ * @returns {string}
+ */
+function wallChar(map, x, y) {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      if (isRoomInterior(typeAt(map, x + dx, y + dy))) return wallBoxChar(map, x, y);
+    }
+  }
+  return '#';
+}
+
+/**
+ * Return the character and packed attribute for a single map cell.
+ * @param {Array} map
+ * @param {number} x
+ * @param {number} y
+ * @param {boolean} isPlayer
+ * @returns {{ ch: string, attr: number }}
+ */
+function cellInfo(map, x, y, isPlayer) {
+  const cell = map[y][x];
+  if (isPlayer) return { ch: '@', attr: ATTR.PLAYER };
+  if (!cell.visited && !cell.visible) return { ch: ' ', attr: ATTR.HIDDEN };
+  if (cell.type === TILE.WALL) return { ch: wallChar(map, x, y), attr: ATTR.WALL };
+  if (cell.type === TILE.DOOR) return { ch: '/', attr: ATTR.DOOR };
+  if (cell.type === TILE.STAIRS_UP || cell.type === TILE.STAIRS_DOWN) {
+    return { ch: TILE_CHAR[cell.type], attr: ATTR.STAIRS };
+  }
+  return { ch: TILE_CHAR[cell.type] ?? ' ', attr: ATTR.FLOOR };
+}
+
+/**
+ * Render the dungeon map by writing directly into blessed's screen cell buffer.
+ * Each cell is set as [attr, char]; lines are marked dirty for the next draw.
+ * @param {import('blessed').Widgets.Screen} screen
  * @param {import('../dungeon/generator.js').Dungeon} dungeon
  * @param {{x:number,y:number}} player
  */
-export function renderMap(box, dungeon, player) {
+export function renderMap(screen, dungeon, player) {
   const { map, width, height } = dungeon;
-  const lines = [];
   for (let y = 0; y < height; y++) {
-    let row = '';
+    if (!screen.lines[y]) continue;
     for (let x = 0; x < width; x++) {
-      row += cellStr(map[y][x], x === player.x && y === player.y);
+      if (screen.lines[y][x] === undefined) continue;
+      const { ch, attr } = cellInfo(map, x, y, x === player.x && y === player.y);
+      screen.lines[y][x] = [attr, ch];
     }
-    lines.push(row);
+    screen.lines[y].dirty = true;
   }
-  box.setContent(lines.join('\n'));
 }

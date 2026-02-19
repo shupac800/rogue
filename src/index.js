@@ -12,14 +12,6 @@ import { getMoveDelta } from './input/keys.js';
 
 const screen = createScreen();
 
-/** Map viewport — 80 columns × 22 rows. */
-const mapBox = blessed.box({
-  top: 0, left: 0,
-  width: 80, height: 22,
-  tags: true,
-  style: { fg: 'white', bg: 'black' },
-});
-
 /** Status bar — bottom 2 rows. */
 const statusBox = blessed.box({
   top: 22, left: 0,
@@ -28,14 +20,13 @@ const statusBox = blessed.box({
   style: { fg: 'white', bg: 'black' },
 });
 
-screen.append(mapBox);
 screen.append(statusBox);
 
 const state = createGame();
 
 /** Re-render all widgets and flush to the terminal. */
 function render() {
-  renderMap(mapBox, state.dungeon, state.player);
+  renderMap(screen, state.dungeon, state.player);
   renderStatus(statusBox, state);
   screen.render();
 }

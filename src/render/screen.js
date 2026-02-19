@@ -12,6 +12,7 @@ import blessed from 'blessed';
 export function createScreen() {
   const screen = blessed.screen({
     smartCSR: true,
+    fullUnicode: true,
     title: 'claude0',
     cols: 80,
     rows: 24,
