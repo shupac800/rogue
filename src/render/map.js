@@ -103,7 +103,15 @@ function cellInfo(map, x, y, isPlayer) {
   if (isPlayer) return { ch: '@', attr: ATTR.PLAYER };
   if (!cell.visited && !cell.visible) return { ch: ' ', attr: ATTR.HIDDEN };
   if (cell.type === TILE.WALL) return { ch: wallChar(map, x, y), attr: ATTR.WALL };
-  if (cell.type === TILE.DOOR) return { ch: '/', attr: ATTR.DOOR };
+  if (cell.type === TILE.DOOR) {
+    const isEntrance = isRoomInterior(typeAt(map, x, y - 1)) ||
+                       isRoomInterior(typeAt(map, x, y + 1)) ||
+                       isRoomInterior(typeAt(map, x - 1, y)) ||
+                       isRoomInterior(typeAt(map, x + 1, y));
+    return isEntrance
+      ? { ch: '/', attr: ATTR.DOOR }
+      : { ch: TILE_CHAR[TILE.CORRIDOR], attr: ATTR.FLOOR };
+  }
   if (cell.type === TILE.STAIRS_UP || cell.type === TILE.STAIRS_DOWN) {
     return { ch: TILE_CHAR[cell.type], attr: ATTR.STAIRS };
   }
