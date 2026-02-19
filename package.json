@@ -1,0 +1,17 @@
+{
+  "name": "claude0",
+  "version": "0.1.0",
+  "description": "Terminal-based roguelike game",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
