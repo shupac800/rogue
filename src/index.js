@@ -10,6 +10,7 @@ import { createGame, movePlayer } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
+import { renderInventory } from './render/inventory.js';
 import { getMoveDelta } from './input/keys.js';
 
 const screen = createScreen();
@@ -33,7 +34,7 @@ const terminalBox = blessed.box({
 screen.append(statusBox);
 screen.append(terminalBox); // appended last so it renders on top
 
-/** Current screen state: 'terminal' | 'game' */
+/** Current screen state: 'terminal' | 'game' | 'inventory' */
 let screenState = 'terminal';
 
 /** Accumulated keystrokes in terminal state. */
@@ -132,6 +133,13 @@ screen.on('keypress', (_ch, key) => {
     return;
   }
 
+  if (screenState === 'inventory') {
+    screenState = 'game';
+    terminalBox.hide();
+    renderGame('', false);
+    return;
+  }
+
   if (moreQueue.length > 0) {
     const next = moreQueue.shift();
     renderGame(next, moreQueue.length > 0);
@@ -140,6 +148,14 @@ screen.on('keypress', (_ch, key) => {
 
   if (state.dead) {
     transitionToTombstone();
+    return;
+  }
+
+  if (keyName === 'i') {
+    screenState = 'inventory';
+    terminalBox.show();
+    renderInventory(terminalBox, state.player.inventory);
+    screen.render();
     return;
   }
 

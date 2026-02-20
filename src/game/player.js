@@ -3,6 +3,8 @@
  * Player entity factory. No project dependencies.
  */
 
+import { createWeapon, createFood } from './item.js';
+
 /**
  * @typedef {{
  *   x: number,
@@ -14,7 +16,8 @@
  *   gold: number,
  *   xp: number,
  *   xpLevel: number,
- *   rank: string
+ *   rank: string,
+ *   inventory: import('./item.js').Item[]
  * }} Player
  */
 
@@ -51,5 +54,9 @@ export function createPlayer(x, y) {
     xp: 0,
     xpLevel: 0,
     rank: RANKS[0],
+    inventory: [
+      createWeapon('+1/+1 sword', 1, 1),
+      createFood('food ration'),
+    ],
   };
 }
