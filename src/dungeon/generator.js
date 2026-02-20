@@ -70,7 +70,7 @@ export function placeStairs(map, rooms, rng) {
  *   width: number,
  *   height: number,
  *   map: Array<Array<{type:number,visible:boolean,visited:boolean}>>,
- *   rooms: Array<{x:number,y:number,width:number,height:number}>,
+ *   rooms: Array<{x:number,y:number,width:number,height:number,illuminated:boolean}>,
  *   corridors: Array<{from:{x:number,y:number},to:{x:number,y:number},bend:{x:number,y:number}}>,
  *   stairsUp: {x:number,y:number},
  *   stairsDown: {x:number,y:number}
@@ -80,20 +80,21 @@ export function placeStairs(map, rooms, rng) {
 /**
  * Generate a complete dungeon level.
  * All returned data is JSON-serializable (plain objects + primitives only).
- * @param {{ width?: number, height?: number, seed?: number }} [options={}]
+ * @param {{ width?: number, height?: number, seed?: number, dungeonLevel?: number }} [options={}]
  * @returns {Dungeon}
  */
 export function generate(options = {}) {
   const width = options.width ?? DEFAULT_WIDTH;
   const height = options.height ?? DEFAULT_HEIGHT;
 
+  const dungeonLevel = options.dungeonLevel ?? 1;
   const rng = createRng(options.seed);
   const map = createBlankMap(width, height);
   const sectors = buildSectors(width, height);
 
   const rooms = [];
   for (const sector of sectors) {
-    const room = generateRoom(sector, rng);
+    const room = generateRoom(sector, rng, dungeonLevel);
     carveRoom(map, room);
     rooms.push(room);
   }

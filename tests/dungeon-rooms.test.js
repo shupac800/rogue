@@ -49,6 +49,30 @@ describe('generateRoom', () => {
       expect(room.y + room.height).toBeLessThan(MAP_H);
     });
   });
+
+  test('all rooms illuminated on dungeon level 1', () => {
+    const rng = seededRng(42);
+    sectors.forEach(sector => {
+      const room = generateRoom(sector, rng, 1);
+      expect(room.illuminated).toBe(true);
+    });
+  });
+
+  test('no rooms illuminated on dungeon level 5', () => {
+    const rng = seededRng(42);
+    sectors.forEach(sector => {
+      const room = generateRoom(sector, rng, 5);
+      expect(room.illuminated).toBe(false);
+    });
+  });
+
+  test('no rooms illuminated on dungeon level 6 (beyond max)', () => {
+    const rng = seededRng(42);
+    sectors.forEach(sector => {
+      const room = generateRoom(sector, rng, 6);
+      expect(room.illuminated).toBe(false);
+    });
+  });
 });
 
 describe('carveRoom', () => {

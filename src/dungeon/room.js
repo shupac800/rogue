@@ -7,7 +7,7 @@ import { TILE, makeCell } from './tiles.js';
 
 /**
  * @typedef {{ x: number, y: number, width: number, height: number }} Rect
- * @typedef {Rect} Room   Interior bounds; walls are carved 1 tile outside.
+ * @typedef {Rect & { illuminated: boolean }} Room  Interior bounds; walls are carved 1 tile outside.
  * @typedef {Rect} Sector Map sub-region assigned to one room.
  */
 
@@ -45,11 +45,13 @@ export function buildSectors(mapWidth, mapHeight) {
 /**
  * Generate a random room placed within a sector with 2-tile padding.
  * Minimum interior size is 3×3.
+ * illuminated probability: 1.0 at dungeonLevel 1, 0 at level 5+, linear between.
  * @param {Sector} sector
  * @param {() => number} rng - Returns a float in [0, 1).
+ * @param {number} [dungeonLevel=1]
  * @returns {Room}
  */
-export function generateRoom(sector, rng) {
+export function generateRoom(sector, rng, dungeonLevel = 1) {
   const pad = 2;
   // Available space for the room interior (walls add 1 on each side, padding adds pad on each side)
   const outerPad = pad + 1; // wall thickness + padding
@@ -76,7 +78,10 @@ export function generateRoom(sector, rng) {
   const x = minOriginX + Math.floor(rng() * (rangeX + 1));
   const y = minOriginY + Math.floor(rng() * (rangeY + 1));
 
-  return { x, y, width: safeW, height: safeH };
+  const illuminationChance = Math.max(0, (5 - dungeonLevel) / 4);
+  const illuminated = rng() < illuminationChance;
+
+  return { x, y, width: safeW, height: safeH, illuminated };
 }
 
 /**
