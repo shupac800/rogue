@@ -43,15 +43,57 @@ export function isWalkable(type) {
 }
 
 /**
+ * @typedef {{ x: number, y: number, amount: number }} GoldItem
+ */
+
+/**
  * @typedef {{
  *   dungeon: import('../dungeon/generator.js').Dungeon,
  *   player: import('./player.js').Player,
  *   dungeonLevel: number,
  *   turn: number,
  *   monsters: import('./monster.js').Monster[],
+ *   goldItems: GoldItem[],
  *   messages: string[]
  * }} GameState
  */
+
+/**
+ * Place gold items in rooms. Each room has a 20% chance of containing one
+ * pile. Amount scales with dungeonLevel: 2 to min(80, dungeonLevel * 16).
+ * @param {import('../dungeon/room.js').Room[]} rooms
+ * @param {() => number} rng
+ * @param {number} dungeonLevel
+ * @returns {GoldItem[]}
+ */
+function placeGoldItems(rooms, rng, dungeonLevel) {
+  const items = [];
+  for (const room of rooms) {
+    if (rng() >= 0.2) continue;
+    const x = room.x + Math.floor(rng() * room.width);
+    const y = room.y + Math.floor(rng() * room.height);
+    const maxAmount = Math.min(80, dungeonLevel * 16);
+    const amount = 2 + Math.floor(rng() * (maxAmount - 1));
+    items.push({ x, y, amount });
+  }
+  return items;
+}
+
+/**
+ * If a gold item exists at (x, y), add its amount to player.gold, remove it,
+ * and push a pickup message.
+ * @param {GameState} state
+ * @param {number} x
+ * @param {number} y
+ */
+function pickupGold(state, x, y) {
+  const idx = state.goldItems.findIndex(g => g.x === x && g.y === y);
+  if (idx === -1) return;
+  const { amount } = state.goldItems[idx];
+  state.player.gold += amount;
+  state.goldItems.splice(idx, 1);
+  state.messages.push(`You pick up ${amount} gold pieces`);
+}
 
 /**
  * Create a new game state for a fresh dungeon level.
@@ -61,13 +103,15 @@ export function isWalkable(type) {
  * @returns {GameState}
  */
 export function createGame(options = {}) {
+  const dungeonLevel = options.dungeonLevel ?? 1;
   const dungeon = generate(options);
   const player = createPlayer(dungeon.stairsUp.x, dungeon.stairsUp.y);
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng);
+  const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel);
   const playerName = 'Fuckface';
   const welcomeMessage = 'Welcome to the Dungeons of Doom';
-  const state = { dungeon, player, dungeonLevel: 1, turn: 0, monsters, messages: [welcomeMessage, `Good luck ${playerName}!`] };
+  const state = { dungeon, player, dungeonLevel, turn: 0, monsters, goldItems, messages: [welcomeMessage, `Good luck ${playerName}!`] };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
   return state;
@@ -150,6 +194,7 @@ export function movePlayer(state, dx, dy) {
   if (map[ny][nx].type === TILE.DOOR) {
     illuminateRoomAt(map, dungeon.rooms, nx + dx, ny + dy);
   }
+  pickupGold(state, nx, ny);
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);

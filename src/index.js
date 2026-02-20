@@ -26,7 +26,7 @@ const state = createGame();
 
 /**
  * Messages from the current turn that have not yet been shown.
- * Non-empty means input is blocked until the player presses space.
+ * Non-empty means any keypress advances to the next message instead of acting.
  * @type {string[]}
  */
 let moreQueue = [];
@@ -37,7 +37,7 @@ let moreQueue = [];
  * @param {boolean} reversed - True while more messages are pending.
  */
 function render(message, reversed) {
-  renderMap(screen, state.dungeon, state.player, state.monsters);
+  renderMap(screen, state.dungeon, state.player, state.monsters, state.goldItems);
   renderStatus(statusBox, state, message, reversed);
   screen.render();
 }
@@ -62,10 +62,8 @@ screen.on('keypress', (_ch, key) => {
   const keyName = key?.name ?? _ch;
 
   if (moreQueue.length > 0) {
-    if (keyName === 'space') {
-      const next = moreQueue.shift();
-      render(next, moreQueue.length > 0);
-    }
+    const next = moreQueue.shift();
+    render(next, moreQueue.length > 0);
     return;
   }
 

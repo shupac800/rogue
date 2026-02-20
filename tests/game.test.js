@@ -124,6 +124,30 @@ describe('createGame', () => {
     const cy = startRoom.y + Math.floor(startRoom.height / 2);
     expect(map[cy][cx].alwaysVisible).toBe(true);
   });
+
+  test('goldItems is an array', () => {
+    expect(Array.isArray(state.goldItems)).toBe(true);
+  });
+
+  test('each gold item has x, y, and amount >= 2', () => {
+    for (const g of state.goldItems) {
+      expect(typeof g.x).toBe('number');
+      expect(typeof g.y).toBe('number');
+      expect(g.amount).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  test('gold item amounts respect DL1 maximum (≤ 16)', () => {
+    const many = [];
+    for (let s = 0; s < 200; s++) many.push(...createGame({ seed: s }).goldItems);
+    for (const g of many) expect(g.amount).toBeLessThanOrEqual(16);
+  });
+
+  test('gold item amounts respect DL5 maximum (≤ 80)', () => {
+    const many = [];
+    for (let s = 0; s < 200; s++) many.push(...createGame({ seed: s, dungeonLevel: 5 }).goldItems);
+    for (const g of many) expect(g.amount).toBeLessThanOrEqual(80);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -329,6 +353,46 @@ describe('movePlayer — door illumination', () => {
     const cx = room.x + Math.floor(room.width / 2);
     const cy = room.y + Math.floor(room.height / 2);
     expect(state.dungeon.map[cy][cx].visible).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// movePlayer — gold pickup
+// ---------------------------------------------------------------------------
+
+describe('movePlayer — gold pickup', () => {
+  let state;
+  beforeEach(() => {
+    state = createGame({ seed: 42 });
+    state.monsters = [];
+  });
+
+  test('walking onto a gold item adds its amount to player.gold', () => {
+    const goldItem = { x: state.player.x + 1, y: state.player.y, amount: 25 };
+    state.goldItems = [goldItem];
+    state.dungeon.map[goldItem.y][goldItem.x].type = 2; // FLOOR, ensure walkable
+    movePlayer(state, 1, 0);
+    if (state.player.x === goldItem.x && state.player.y === goldItem.y) {
+      expect(state.player.gold).toBe(25);
+      expect(state.goldItems).toHaveLength(0);
+    }
+  });
+
+  test('picking up gold pushes a message', () => {
+    const goldItem = { x: state.player.x + 1, y: state.player.y, amount: 10 };
+    state.goldItems = [goldItem];
+    state.dungeon.map[goldItem.y][goldItem.x].type = 2;
+    movePlayer(state, 1, 0);
+    if (state.player.x === goldItem.x) {
+      expect(state.messages.some(m => m.includes('10'))).toBe(true);
+    }
+  });
+
+  test('walking onto an empty cell does not change player.gold', () => {
+    state.goldItems = [];
+    const before = state.player.gold;
+    movePlayer(state, 0, 0);
+    expect(state.player.gold).toBe(before);
   });
 });
 

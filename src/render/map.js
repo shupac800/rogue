@@ -25,6 +25,7 @@ const ATTR = {
   PLAYER:  (1 << 18) | (3 << 9) | 0,  // bold + yellow fg (3), black bg
   HIDDEN:  (0x1ff << 9) | 0,           // terminal default fg, black bg
   MONSTER: (1 << 9) | 0,              // red fg (1), black bg
+  GOLD:    (1 << 18) | (3 << 9) | 0,  // bold + yellow fg (3), black bg
 };
 
 /** Box-drawing character lookup: key is 'UDLR' (1=WALL neighbor, 0=other). */
@@ -126,14 +127,16 @@ function cellInfo(map, x, y, isPlayer) {
  * @param {import('../dungeon/generator.js').Dungeon} dungeon
  * @param {{x:number,y:number}} player
  * @param {import('../game/monster.js').Monster[]} monsters
+ * @param {import('../game/state.js').GoldItem[]} goldItems
  */
-export function renderMap(screen, dungeon, player, monsters) {
+export function renderMap(screen, dungeon, player, monsters, goldItems) {
   const { map, width, height } = dungeon;
 
   const monsterMap = new Map();
   for (const m of monsters) {
     if (m.hp > 0) monsterMap.set(`${m.x},${m.y}`, m.char);
   }
+  const goldSet = new Set(goldItems.map(g => `${g.x},${g.y}`));
 
   for (let y = 0; y < height; y++) {
     if (!screen.lines[y]) continue;
@@ -144,6 +147,8 @@ export function renderMap(screen, dungeon, player, monsters) {
       const monsterChar = !isPlayer && cell.visible ? monsterMap.get(`${x},${y}`) : undefined;
       if (monsterChar !== undefined) {
         screen.lines[y][x] = [ATTR.MONSTER, monsterChar];
+      } else if (!isPlayer && cell.visible && goldSet.has(`${x},${y}`)) {
+        screen.lines[y][x] = [ATTR.GOLD, '$'];
       } else {
         const { ch, attr } = cellInfo(map, x, y, isPlayer);
         screen.lines[y][x] = [attr, ch];
