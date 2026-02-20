@@ -12,7 +12,6 @@ import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
 import { renderInventory } from './render/inventory.js';
 import { renderArmorSelect } from './render/armor-select.js';
-import { getItemActions, renderItemAction } from './render/item-action.js';
 import { getMoveDelta } from './input/keys.js';
 
 const screen = createScreen();
@@ -36,17 +35,11 @@ const terminalBox = blessed.box({
 screen.append(statusBox);
 screen.append(terminalBox); // appended last so it renders on top
 
-/** Current screen state: 'terminal' | 'game' | 'inventory' | 'item-action' | 'armor' */
+/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' */
 let screenState = 'terminal';
 
 /** Cursor position in the inventory screen. */
 let inventoryIdx = 0;
-/** Item currently open in the action menu. */
-let actionItem = null;
-/** Available actions for actionItem. */
-let currentActions = [];
-/** Cursor position in the action menu. */
-let actionIdx = 0;
 
 /** Armor items visible in the don/doff screen (subset of player inventory). */
 let currentArmorItems = [];
@@ -151,7 +144,8 @@ screen.on('keypress', (_ch, key) => {
 
   if (screenState === 'inventory') {
     const inv = state.player.inventory;
-    if (keyName === 'escape' || keyName === 'q') {
+    const item = inv[inventoryIdx];
+    if (keyName === 'escape') {
       screenState = 'game';
       terminalBox.hide();
       renderGame('', false);
@@ -161,64 +155,29 @@ screen.on('keypress', (_ch, key) => {
       inventoryIdx = Math.max(0, inventoryIdx - 1);
     } else if (keyName === 'down' || keyName === 'j') {
       inventoryIdx = Math.min(inv.length - 1, inventoryIdx + 1);
-    } else if (_ch && _ch >= 'a' && _ch <= 'z') {
+    } else if (_ch && _ch >= 'a' && _ch <= 'z' && !['d', 'j', 'k', 'q', 'r', 'w'].includes(_ch)) {
       const n = _ch.charCodeAt(0) - 97;
       if (n < inv.length) inventoryIdx = n;
-    } else if (keyName === 'enter' || keyName === 'return') {
-      if (inv.length > 0) {
-        actionItem = inv[inventoryIdx];
-        currentActions = getItemActions(actionItem, state.player.equippedArmor, state.player.equippedWeapon);
-        actionIdx = 0;
-        screenState = 'item-action';
-        renderItemAction(terminalBox, actionItem, state.player.equippedArmor, state.player.equippedWeapon, currentActions, actionIdx);
-        screen.render();
-        return;
-      }
-    }
-    renderInventory(terminalBox, inv, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx);
-    screen.render();
-    return;
-  }
-
-  if (screenState === 'item-action') {
-    if (keyName === 'escape' || keyName === 'q') {
-      screenState = 'inventory';
-      renderInventory(terminalBox, state.player.inventory, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx);
-      screen.render();
+    } else if (_ch === 'd' && item && item !== state.player.equippedArmor && item !== state.player.equippedWeapon) {
+      dropItem(state, item);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
+    } else if (_ch === 'w' && item?.type === 'weapon') {
+      if (item === state.player.equippedWeapon) unwieldWeapon(state); else wieldWeapon(state, item);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
+    } else if (_ch === 'D' && item?.type === 'armor') {
+      if (item === state.player.equippedArmor) removeArmor(state); else wearArmor(state, item);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
       return;
     }
-    if (keyName === 'up' || keyName === 'k') {
-      actionIdx = Math.max(0, actionIdx - 1);
-    } else if (keyName === 'down' || keyName === 'j') {
-      actionIdx = Math.min(currentActions.length - 1, actionIdx + 1);
-    } else if (_ch && _ch >= '1' && _ch <= '9') {
-      const n = _ch.charCodeAt(0) - 49;
-      if (n < currentActions.length) actionIdx = n;
-    } else if (keyName === 'enter' || keyName === 'return') {
-      const action = currentActions[actionIdx];
-      if (action === 'Drop') {
-        dropItem(state, actionItem);
-        screenState = 'game';
-        terminalBox.hide();
-        afterTurn();
-        return;
-      } else if (action === 'Don') {
-        wearArmor(state, actionItem);
-      } else if (action === 'Doff') {
-        removeArmor(state);
-      } else if (action === 'Wield') {
-        wieldWeapon(state, actionItem);
-      } else if (action === 'Unwield') {
-        unwieldWeapon(state);
-      }
-      if (action === 'Don' || action === 'Doff' || action === 'Wield' || action === 'Unwield') {
-        screenState = 'game';
-        terminalBox.hide();
-        afterTurn();
-        return;
-      }
-    }
-    renderItemAction(terminalBox, actionItem, state.player.equippedArmor, state.player.equippedWeapon, currentActions, actionIdx);
+    renderInventory(terminalBox, inv, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx);
     screen.render();
     return;
   }
@@ -253,6 +212,15 @@ screen.on('keypress', (_ch, key) => {
         return;
       }
       // else: can't don while wearing armor — re-render (action line explains why)
+    } else if (_ch === 'd') {
+      const selected = currentArmorItems[armorSelectIdx];
+      if (selected) {
+        dropItem(state, selected);
+        screenState = 'game';
+        terminalBox.hide();
+        afterTurn();
+        return;
+      }
     }
     renderArmorSelect(terminalBox, currentArmorItems, state.player.equippedArmor, armorSelectIdx);
     screen.render();

@@ -22,6 +22,26 @@ export function formatItem(item) {
 }
 
 /**
+ * Build the command hint string for the currently selected item.
+ * @param {import('../game/item.js').Item|undefined} item
+ * @param {import('../game/item.js').ArmorItem|null} equippedArmor
+ * @param {import('../game/item.js').WeaponItem|null} equippedWeapon
+ * @returns {string}
+ */
+export function getInventoryHints(item, equippedArmor, equippedWeapon) {
+  if (!item) return 'Esc: close';
+  const hints = [];
+  if (item.type === 'weapon') hints.push(item === equippedWeapon ? 'w: unwield' : 'w: wield');
+  if (item.type === 'armor')  hints.push(item === equippedArmor  ? 'D: doff'    : 'D: don');
+  if (item.type === 'potion') hints.push('q: quaff');
+  if (item.type === 'scroll') hints.push('r: read');
+  const canDrop = item !== equippedArmor && item !== equippedWeapon;
+  if (canDrop) hints.push('d: drop');
+  hints.push('Esc: close');
+  return hints.join('   ');
+}
+
+/**
  * Render the inventory list into the given box.
  * Items are labelled a), b), c)…  Equipped armor is marked [worn],
  * wielded weapon is marked [wielded].
@@ -47,7 +67,8 @@ export function renderInventory(box, inventory, equippedArmor, equippedWeapon, s
         return `${cursor} ${label}) ${detail}${worn}${wielded}`;
       });
 
-  const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ or a-z to move   Enter: actions   Esc: close'];
+  const hints = getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon);
+  const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ or a-z to navigate', hints];
   const W = Math.max(...block.map(l => l.length));
   const hPad = ' '.repeat(Math.max(0, Math.floor((COLS - W) / 2)));
   const vPad = '\n'.repeat(Math.max(0, Math.floor((ROWS - block.length) / 2)));

@@ -48,7 +48,7 @@ export function renderArmorSelect(box, armorItems, equippedArmor, selectedIdx) {
     '',
     action,
     '',
-    '↑↓ or 1-9 to move   Esc to cancel',
+    '↑↓ or 1-9 to move   d: drop   Esc to cancel',
   ];
   const W = Math.max(...block.map(l => l.length));
   const hPad = ' '.repeat(Math.max(0, Math.floor((COLS - W) / 2)));

@@ -292,8 +292,12 @@ export function dropItem(state, item) {
   const idx = state.player.inventory.indexOf(item);
   if (idx === -1) return;
   if (item === state.player.equippedArmor) {
-    state.player.equippedArmor = null;
-    recomputeDefense(state.player);
+    state.messages = ["Remove it before dropping"];
+    return;
+  }
+  if (item === state.player.equippedWeapon) {
+    state.messages = ["Unwield it before dropping"];
+    return;
   }
   state.player.inventory.splice(idx, 1);
   state.dungeonItems.push({ x, y, item });

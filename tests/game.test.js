@@ -8,6 +8,7 @@ import {
   movePlayer,
   isWalkable,
   illuminateRoomAt,
+  dropItem,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
@@ -411,5 +412,58 @@ describe('movePlayer — wait', () => {
     movePlayer(state, 0, 0);
     expect(state.player.x).toBe(origX);
     expect(state.player.y).toBe(origY);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dropItem
+// ---------------------------------------------------------------------------
+
+describe('dropItem', () => {
+  let state;
+  beforeEach(() => {
+    state = createGame({ seed: 42 });
+    state.monsters = [];
+    state.goldItems = [];
+    state.dungeonItems = [];
+    // Move player off the up-stairs to a plain floor tile
+    const { map } = state.dungeon;
+    outer: for (let y = 0; y < map.length; y++) {
+      for (let x = 0; x < map[0].length; x++) {
+        if (map[y][x].type === TILE.FLOOR) { state.player.x = x; state.player.y = y; break outer; }
+      }
+    }
+  });
+
+  test('drops a non-equipped item onto the floor', () => {
+    const food = state.player.inventory.find(i => i.type === 'food');
+    const before = state.player.inventory.length;
+    dropItem(state, food);
+    expect(state.player.inventory.length).toBe(before - 1);
+    expect(state.dungeonItems.some(d => d.item === food)).toBe(true);
+  });
+
+  test('cannot drop wielded weapon', () => {
+    const weapon = state.player.equippedWeapon;
+    const before = state.player.inventory.length;
+    dropItem(state, weapon);
+    expect(state.player.inventory.length).toBe(before);
+    expect(state.messages[0]).toMatch(/unwield it before dropping/i);
+  });
+
+  test('cannot drop equipped armor', () => {
+    const armor = state.player.equippedArmor;
+    const before = state.player.inventory.length;
+    dropItem(state, armor);
+    expect(state.player.inventory.length).toBe(before);
+    expect(state.messages[0]).toMatch(/remove it before dropping/i);
+  });
+
+  test('can drop unequipped armor', () => {
+    const armor = state.player.equippedArmor;
+    state.player.equippedArmor = null;
+    const before = state.player.inventory.length;
+    dropItem(state, armor);
+    expect(state.player.inventory.length).toBe(before - 1);
   });
 });
