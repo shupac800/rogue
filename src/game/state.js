@@ -321,6 +321,55 @@ export function eatFood(state, item) {
   state.messages = [`You eat ${article} ${item.name}`];
 }
 
+/**
+ * Quaff a potion: remove it from inventory and apply its effect.
+ * No-op if item is not in inventory.
+ * @param {GameState} state
+ * @param {import('./item.js').PotionItem} item
+ */
+export function quaffPotion(state, item) {
+  const idx = state.player.inventory.indexOf(item);
+  if (idx === -1) return;
+  state.player.inventory.splice(idx, 1);
+  const { player } = state;
+  const effect = item.name.replace(/^potion of /, '');
+  switch (effect) {
+    case 'healing':
+      player.hp = Math.min(player.maxHp, player.hp + Math.floor(Math.random() * 8) + 8);
+      state.messages = ['You feel better'];
+      break;
+    case 'extra healing':
+      player.hp = player.maxHp;
+      state.messages = ['You feel much better'];
+      break;
+    case 'poison':
+      player.hp -= Math.floor(Math.random() * 8) + 1;
+      state.messages = ['You feel very sick'];
+      handleDeath(state);
+      break;
+    case 'gain strength':
+      player.attack += 1;
+      state.messages = ['You feel stronger'];
+      break;
+    case 'restore strength':
+      state.messages = ['You feel yourself again'];
+      break;
+    case 'raise level': {
+      const newLevel = Math.min(RANKS.length - 1, player.xpLevel + 1);
+      if (newLevel > player.xpLevel) {
+        player.xpLevel = newLevel;
+        player.rank = RANKS[newLevel];
+        state.messages = [`You have earned the rank of ${player.rank}`];
+      } else {
+        state.messages = ['You feel more experienced'];
+      }
+      break;
+    }
+    default:
+      state.messages = ['You feel strange'];
+  }
+}
+
 export function illuminateRoomAt(map, rooms, x, y) {
   const room = findRoomContaining(rooms, x, y);
   if (room?.illuminated) revealRoom(map, room);

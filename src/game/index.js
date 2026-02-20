@@ -4,5 +4,5 @@
  */
 
 export { createPlayer } from './player.js';
-export { createGame, movePlayer, isWalkable, SIGHT_RADIUS, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood } from './state.js';
+export { createGame, movePlayer, isWalkable, SIGHT_RADIUS, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion } from './state.js';
 export { createMonster } from './monster.js';
