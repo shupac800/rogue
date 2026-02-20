@@ -79,6 +79,7 @@ export function stepMonsters(state, rng = Math.random) {
         const result = resolveCombat(m, player, rng);
         const msg = result.hit ? `The ${m.name} hits you` : `The ${m.name} misses`;
         (state.messages ??= []).push(msg);
+        if (result.hit && player.hp <= 0) state.causeOfDeath = m.name;
         break;
       }
 

@@ -50,11 +50,14 @@ export function isWalkable(type) {
  * @typedef {{
  *   dungeon: import('../dungeon/generator.js').Dungeon,
  *   player: import('./player.js').Player,
+ *   playerName: string,
  *   dungeonLevel: number,
  *   turn: number,
  *   monsters: import('./monster.js').Monster[],
  *   goldItems: GoldItem[],
- *   messages: string[]
+ *   messages: string[],
+ *   dead: boolean,
+ *   causeOfDeath: string|null
  * }} GameState
  */
 
@@ -99,7 +102,7 @@ function pickupGold(state, x, y) {
  * Create a new game state for a fresh dungeon level.
  * Generates the dungeon, places the player on the up-stairs, and computes
  * the initial field of view.
- * @param {{ width?: number, height?: number, seed?: number }} [options={}]
+ * @param {{ width?: number, height?: number, seed?: number, dungeonLevel?: number, playerName?: string }} [options={}]
  * @returns {GameState}
  */
 export function createGame(options = {}) {
@@ -109,9 +112,9 @@ export function createGame(options = {}) {
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng);
   const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel);
-  const playerName = 'Fuckface';
+  const playerName = options.playerName ?? 'Adventurer';
   const welcomeMessage = 'Welcome to the Dungeons of Doom';
-  const state = { dungeon, player, dungeonLevel, turn: 0, monsters, goldItems, messages: [welcomeMessage, `Good luck ${playerName}!`] };
+  const state = { dungeon, player, playerName, dungeonLevel, turn: 0, monsters, goldItems, messages: [welcomeMessage, `Good luck ${playerName}!`], dead: false, causeOfDeath: null };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
   return state;
@@ -146,6 +149,17 @@ function revealRoom(map, room) {
  * @param {number} x
  * @param {number} y
  */
+/**
+ * If the player is dead and not yet marked so, set state.dead and push the
+ * death message. No-op if player is alive or death was already recorded.
+ * @param {GameState} state
+ */
+function handleDeath(state) {
+  if (state.player.hp > 0 || state.dead) return;
+  state.dead = true;
+  state.messages.push('You died');
+}
+
 export function illuminateRoomAt(map, rooms, x, y) {
   const room = findRoomContaining(rooms, x, y);
   if (room?.illuminated) revealRoom(map, room);
@@ -185,7 +199,7 @@ export function movePlayer(state, dx, dy) {
     state.turn += 1;
     computeFov(map, player, SIGHT_RADIUS);
     stepMonsters(state);
-    if (player.hp <= 0) state.messages.push('You died');
+    handleDeath(state);
     return;
   }
 
@@ -198,5 +212,5 @@ export function movePlayer(state, dx, dy) {
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);
-  if (player.hp <= 0) state.messages.push('You died');
+  handleDeath(state);
 }
