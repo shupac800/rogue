@@ -1,23 +1,31 @@
 /**
  * @module render/status
  * Renders the player status bar into a blessed box widget.
+ *
+ * Layout (80 columns):
+ *   [message — cols 0..40][stats right-aligned — cols 41..79]
+ *
+ * Stats block is always 39 chars wide (fixed-width fields):
+ *   HP:XXX/XXX  Lv:XX  XP:XXXXX  Gold:XXXXX
+ *
+ * Turn display removed reversibly — to restore, add to STAT_PARTS:
+ *   `Turn:${String(turn).padStart(5)}`  (+2 sep = 12 more chars)
  */
 
+/** Fixed width of the right-aligned stats block. */
+const STATS_WIDTH = 39;
+
 /**
- * Format all relevant player stats into a single status line.
- * @param {import('../game/state.js').GameState} state
+ * Build the right-aligned stats string. Always exactly STATS_WIDTH chars.
+ * @param {import('../game/player.js').Player} player
  * @returns {string}
  */
-function formatStatus(state) {
-  const { player, turn } = state;
-  const parts = [
-    `HP: ${player.hp}/${player.maxHp}`,
-    `Lv:${player.level}`,
-    `XP:${player.xp}`,
-    `Gold:${player.gold}`,
-    `Turn:${turn}`,
-  ];
-  return parts.join('  ');
+function formatStats(player) {
+  const hp   = `HP:${String(player.hp).padStart(3)}/${String(player.maxHp).padStart(3)}`;
+  const lv   = `Lv:${String(player.level).padStart(2)}`;
+  const xp   = `XP:${String(player.xp).padStart(5)}`;
+  const gold = `Gold:${String(player.gold).padStart(5)}`;
+  return [hp, lv, xp, gold].join('  ');
 }
 
 /**
@@ -26,5 +34,8 @@ function formatStatus(state) {
  * @param {import('../game/state.js').GameState} state
  */
 export function renderStatus(box, state) {
-  box.setContent(formatStatus(state));
+  const stats = formatStats(state.player);
+  const msgWidth = 80 - STATS_WIDTH;
+  const msg = (state.message ?? '').slice(0, msgWidth).padEnd(msgWidth);
+  box.setContent(msg + stats);
 }

@@ -38,7 +38,8 @@ export function isWalkable(type) {
  *   dungeon: import('../dungeon/generator.js').Dungeon,
  *   player: import('./player.js').Player,
  *   turn: number,
- *   monsters: import('./monster.js').Monster[]
+ *   monsters: import('./monster.js').Monster[],
+ *   message: string
  * }} GameState
  */
 
@@ -54,7 +55,7 @@ export function createGame(options = {}) {
   const player = createPlayer(dungeon.stairsUp.x, dungeon.stairsUp.y);
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng);
-  const state = { dungeon, player, turn: 0, monsters };
+  const state = { dungeon, player, turn: 0, monsters, message: 'Welcome to the Dungeons of Doom' };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   return state;
 }
@@ -81,6 +82,7 @@ export function movePlayer(state, dx, dy) {
   if (target) {
     resolveCombat(player, target);
     state.monsters = monsters.filter(m => m.hp > 0);
+    state.message = `You hit the ${target.name}`;
     state.turn += 1;
     computeFov(map, player, SIGHT_RADIUS);
     return;
@@ -88,6 +90,7 @@ export function movePlayer(state, dx, dy) {
 
   player.x = nx;
   player.y = ny;
+  state.message = '';
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);
