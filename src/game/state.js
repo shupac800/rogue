@@ -85,7 +85,7 @@ export function movePlayer(state, dx, dy) {
     resolveCombat(player, target);
     state.monsters = monsters.filter(m => m.hp > 0);
     state.messages.push(`You hit the ${target.name}`);
-    if (target.hp <= 0) state.messages.push(`The ${target.name} dies`);
+    if (target.hp <= 0) state.messages.push(`You have defeated the ${target.name}`);
     state.turn += 1;
     computeFov(map, player, SIGHT_RADIUS);
     stepMonsters(state);
