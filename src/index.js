@@ -6,7 +6,7 @@
 
 import blessed from 'blessed';
 import { createScreen } from './render/screen.js';
-import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon } from './game/index.js';
+import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
@@ -169,6 +169,12 @@ screen.on('keypress', (_ch, key) => {
       return;
     } else if (_ch === 'D' && item?.type === 'armor') {
       if (item === state.player.equippedArmor) removeArmor(state); else wearArmor(state, item);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
+    } else if (_ch === 'e' && item?.type === 'food') {
+      eatFood(state, item);
       screenState = 'game';
       terminalBox.hide();
       afterTurn();

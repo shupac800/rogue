@@ -27,17 +27,23 @@ import { createWeapon, createFood, createArmor } from './item.js';
  */
 
 /** Rank title for each xpLevel index. */
-export const RANKS = ['Amateur', 'Brawler'];
+export const RANKS = ['Apprentice', 'Guild Novice', 'Journeyman', 'Adventurer'];
+
+/** Minimum XP required for each rank level. */
+const XP_THRESHOLDS = [0, 5, 20, 80];
 
 /**
- * Compute xpLevel from an xp value.
- * 0 XP → level 0; 1+ XP → level 1 (table-driven, expand RANKS to add tiers).
+ * Compute xpLevel from an xp value using XP_THRESHOLDS.
+ * Returns the highest level whose threshold is met.
  * @param {number} xp
  * @returns {number}
  */
 export function xpToLevel(xp) {
-  if (xp <= 0) return 0;
-  return Math.min(RANKS.length - 1, 1);
+  let level = 0;
+  for (let i = 1; i < XP_THRESHOLDS.length; i++) {
+    if (xp >= XP_THRESHOLDS[i]) level = i;
+  }
+  return level;
 }
 
 /**

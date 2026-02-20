@@ -33,6 +33,7 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon) {
   const hints = [];
   if (item.type === 'weapon') hints.push(item === equippedWeapon ? 'w: unwield' : 'w: wield');
   if (item.type === 'armor')  hints.push(item === equippedArmor  ? 'D: doff'    : 'D: don');
+  if (item.type === 'food')   hints.push('e: eat');
   if (item.type === 'potion') hints.push('q: quaff');
   if (item.type === 'scroll') hints.push('r: read');
   const canDrop = item !== equippedArmor && item !== equippedWeapon;
@@ -60,11 +61,10 @@ export function renderInventory(box, inventory, equippedArmor, equippedWeapon, s
     ? ['  (nothing)']
     : inventory.map((item, i) => {
         const cursor = i === selectedIdx ? '>' : ' ';
-        const label = String.fromCharCode(97 + i);
         const detail = formatItem(item);
         const worn    = item === equippedArmor  ? ' [worn]'    : '';
         const wielded = item === equippedWeapon ? ' [wielded]' : '';
-        return `${cursor} ${label}) ${detail}${worn}${wielded}`;
+        return `${cursor} ${detail}${worn}${wielded}`;
       });
 
   const hints = getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon);

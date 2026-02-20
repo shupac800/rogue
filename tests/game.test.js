@@ -41,7 +41,7 @@ describe('createPlayer', () => {
     expect(p.gold).toBe(0);
     expect(p.xp).toBe(0);
     expect(p.xpLevel).toBe(0);
-    expect(p.rank).toBe('Amateur');
+    expect(p.rank).toBe('Apprentice');
   });
 
   test('returns distinct objects on each call', () => {

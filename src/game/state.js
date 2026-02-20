@@ -305,6 +305,22 @@ export function dropItem(state, item) {
   state.messages = [`You drop ${article} ${item.name}`];
 }
 
+/**
+ * Eat a food item: remove it from inventory and restore 1–8 HP (capped at maxHp).
+ * No-op if item is not in inventory.
+ * @param {GameState} state
+ * @param {import('./item.js').FoodItem} item
+ */
+export function eatFood(state, item) {
+  const idx = state.player.inventory.indexOf(item);
+  if (idx === -1) return;
+  state.player.inventory.splice(idx, 1);
+  const restored = Math.floor(Math.random() * 8) + 1;
+  state.player.hp = Math.min(state.player.maxHp, state.player.hp + restored);
+  const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
+  state.messages = [`You eat ${article} ${item.name}`];
+}
+
 export function illuminateRoomAt(map, rooms, x, y) {
   const room = findRoomContaining(rooms, x, y);
   if (room?.illuminated) revealRoom(map, room);
@@ -340,9 +356,13 @@ export function movePlayer(state, dx, dy) {
       state.messages.push(PLAYER_HIT_MSGS[tier](target.name));
       if (target.hp <= 0) {
         player.xp += target.xp;
+        const prevRank = player.rank;
         player.xpLevel = xpToLevel(player.xp);
         player.rank = RANKS[player.xpLevel];
         state.messages.push(`You have defeated the ${target.name}`);
+        if (player.rank !== prevRank) {
+          state.messages.push(`You have earned the rank of ${player.rank}`);
+        }
       }
     }
     state.monsters = monsters.filter(m => m.hp > 0);

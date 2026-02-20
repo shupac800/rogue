@@ -3,18 +3,18 @@
  * Renders the player status bar into a blessed box widget.
  *
  * Layout (80 columns):
- *   [message — cols 0..40][stats right-aligned — cols 41..79]
+ *   [message — cols 0..46][stats right-aligned — cols 47..79]
  *
- * Stats block is always 39 chars wide (fixed-width fields):
- *   HP:XXX/XXX  DL:XX  XP:XXXXX  Au:XXXXX
- * DL = dungeon level. Au = gold (saves 2 cols vs "Gold"). Player xpLevel/rank shown elsewhere when layout allows.
- *
- * Turn display removed reversibly — to restore, add to STAT_PARTS:
- *   `Turn:${String(turn).padStart(5)}`  (+2 sep = 12 more chars)
+ * Stats block is always 34 chars wide (fixed-width fields):
+ *   HP:XXX/XXX  Guild Novice  Au:XXXXX
+ * Au = gold. Rank replaces DL and XP.
  */
 
 /** Fixed width of the right-aligned stats block. */
-const STATS_WIDTH = 37;
+const STATS_WIDTH = 34;
+
+/** Width of the rank field (longest rank: "Guild Novice" = 12). */
+const RANK_WIDTH = 12;
 
 /**
  * Build the right-aligned stats string. Always exactly STATS_WIDTH chars.
@@ -22,12 +22,11 @@ const STATS_WIDTH = 37;
  * @returns {string}
  */
 function formatStats(state) {
-  const { player, dungeonLevel } = state;
+  const { player } = state;
   const hp   = `HP:${String(player.hp).padStart(3)}/${String(player.maxHp).padStart(3)}`;
-  const dl   = `DL:${String(dungeonLevel).padStart(2)}`;
-  const xp   = `XP:${String(player.xp).padStart(5)}`;
+  const rank = player.rank.padEnd(RANK_WIDTH);
   const gold = `Au:${String(player.gold).padStart(5)}`;
-  return [hp, dl, xp, gold].join('  ');
+  return [hp, rank, gold].join('  ');
 }
 
 /**
