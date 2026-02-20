@@ -8,7 +8,7 @@ import { TILE } from '../dungeon/tiles.js';
 import { generate, createRng } from '../dungeon/generator.js';
 import { computeFov } from '../fov/index.js';
 import { findRoomContaining } from '../dungeon/room.js';
-import { createPlayer, xpToLevel, RANKS, REGEN_RATES } from './player.js';
+import { createPlayer, xpToLevel, RANKS, REGEN_RATES, HP_PER_RANK } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 import { generateDungeonItem } from './item.js';
@@ -358,8 +358,7 @@ export function quaffPotion(state, item) {
     case 'raise level': {
       const newLevel = Math.min(RANKS.length - 1, player.xpLevel + 1);
       if (newLevel > player.xpLevel) {
-        player.xpLevel = newLevel;
-        player.rank = RANKS[newLevel];
+        promotePlayer(player, player.xpLevel, newLevel);
         state.messages = [`You have earned the rank of ${player.rank}`];
       } else {
         state.messages = ['You feel more experienced'];
@@ -443,6 +442,22 @@ export function ascendStairs(state) {
 }
 
 /**
+ * Promote the player from prevLevel to newLevel.
+ * Sums the max HP increases for every rank gained, scales current HP to the
+ * same percentage of the new max (rounded, minimum 1), and updates rank fields.
+ * @param {import('./player.js').Player} player
+ * @param {number} prevLevel
+ * @param {number} newLevel
+ */
+function promotePlayer(player, prevLevel, newLevel) {
+  const ratio = player.hp / player.maxHp;
+  for (let lv = prevLevel + 1; lv <= newLevel; lv++) player.maxHp += HP_PER_RANK[lv];
+  player.hp = Math.max(1, Math.round(ratio * player.maxHp));
+  player.xpLevel = newLevel;
+  player.rank = RANKS[newLevel];
+}
+
+/**
  * Restore 1 HP if the player is alive, below max HP, and the turn count is
  * a multiple of the rank-appropriate regen rate. No-op otherwise.
  * @param {GameState} state
@@ -484,11 +499,11 @@ export function movePlayer(state, dx, dy) {
       state.messages.push(PLAYER_HIT_MSGS[tier](target.name));
       if (target.hp <= 0) {
         player.xp += target.xp;
-        const prevRank = player.rank;
-        player.xpLevel = xpToLevel(player.xp);
-        player.rank = RANKS[player.xpLevel];
+        const prevLevel = player.xpLevel;
+        const newLevel = xpToLevel(player.xp);
         state.messages.push(`You have defeated the ${target.name}`);
-        if (player.rank !== prevRank) {
+        if (newLevel > prevLevel) {
+          promotePlayer(player, prevLevel, newLevel);
           state.messages.push(`You have earned the rank of ${player.rank}`);
         }
       }

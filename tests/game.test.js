@@ -2,7 +2,7 @@
  * Tests for src/game/player.js and src/game/state.js
  */
 
-import { createPlayer, REGEN_RATES } from '../src/game/player.js';
+import { createPlayer, REGEN_RATES, HP_PER_RANK } from '../src/game/player.js';
 import {
   createGame,
   movePlayer,
@@ -11,6 +11,7 @@ import {
   dropItem,
   descendStairs,
   ascendStairs,
+  quaffPotion,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
@@ -36,14 +37,14 @@ describe('createPlayer', () => {
 
   test('sets correct starting stats', () => {
     const p = createPlayer(0, 0);
-    expect(p.hp).toBe(4);
-    expect(p.maxHp).toBe(20);
+    expect(p.hp).toBe(5);
+    expect(p.maxHp).toBe(5);
     expect(p.attack).toBe(3);
     expect(p.defense).toBe(4); // baseDefense 1 + leather armor AC 3
     expect(p.gold).toBe(0);
     expect(p.xp).toBe(0);
     expect(p.xpLevel).toBe(0);
-    expect(p.rank).toBe('Apprentice');
+    expect(p.rank).toBe('');
   });
 
   test('returns distinct objects on each call', () => {
@@ -51,7 +52,7 @@ describe('createPlayer', () => {
     const b = createPlayer(0, 0);
     expect(a).not.toBe(b);
     a.hp = 1;
-    expect(b.hp).toBe(4);
+    expect(b.hp).toBe(5);
   });
 });
 
@@ -497,7 +498,7 @@ describe('HP regeneration', () => {
   });
 
   test('REGEN_RATES has one entry per rank and decreases with level', () => {
-    expect(REGEN_RATES).toHaveLength(4);
+    expect(REGEN_RATES).toHaveLength(15);
     for (let i = 1; i < REGEN_RATES.length; i++) {
       expect(REGEN_RATES[i]).toBeLessThan(REGEN_RATES[i - 1]);
     }
@@ -531,7 +532,7 @@ describe('HP regeneration', () => {
   });
 
   test('higher xpLevel uses a faster (lower) regen rate', () => {
-    state.player.xpLevel = 3; // Adventurer: rate = 10
+    state.player.xpLevel = 3; // Journeyman: rate = 32
     state.turn = REGEN_RATES[3] - 1;
     movePlayer(state, 0, 0);
     expect(state.player.hp).toBe(2);
@@ -637,5 +638,47 @@ describe('ascendStairs', () => {
     ascendStairs(state); // back to level 1
     expect(state.player.x).toBe(state.dungeon.stairsDown.x);
     expect(state.player.y).toBe(state.dungeon.stairsDown.y);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HP on rank-up
+// ---------------------------------------------------------------------------
+
+describe('HP on rank-up', () => {
+  function raiseLevel(state) {
+    const potion = { type: 'potion', name: 'potion of raise level' };
+    state.player.inventory.push(potion);
+    quaffPotion(state, potion);
+  }
+
+  test('HP_PER_RANK increases with rank index', () => {
+    for (let i = 2; i < HP_PER_RANK.length; i++) {
+      expect(HP_PER_RANK[i]).toBeGreaterThanOrEqual(HP_PER_RANK[i - 1]);
+    }
+  });
+
+  test('maxHp increases by HP_PER_RANK[1] when promoting from rank 0', () => {
+    const state = createGame({ seed: 42 });
+    const before = state.player.maxHp;
+    raiseLevel(state);
+    expect(state.player.maxHp).toBe(before + HP_PER_RANK[1]);
+  });
+
+  test('current HP is scaled to the same percentage of new maxHp', () => {
+    const state = createGame({ seed: 42 });
+    state.player.hp = Math.floor(state.player.maxHp / 2);
+    const ratio = state.player.hp / state.player.maxHp;
+    raiseLevel(state);
+    const expected = Math.max(1, Math.round(ratio * state.player.maxHp));
+    expect(state.player.hp).toBe(expected);
+  });
+
+  test('HP is never reduced below 1 on promotion', () => {
+    const state = createGame({ seed: 42 });
+    state.player.hp = 1;
+    state.player.maxHp = 1000; // contrived: ~0.1% ratio rounds to 0 without the clamp
+    raiseLevel(state);
+    expect(state.player.hp).toBeGreaterThanOrEqual(1);
   });
 });
