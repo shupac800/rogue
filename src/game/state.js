@@ -69,11 +69,11 @@ export function isWalkable(type) {
 function placeGoldItems(rooms, rng, dungeonLevel) {
   const items = [];
   for (const room of rooms) {
-    if (rng() >= 0.2) continue;
+    // TODO: restore 20% chance: if (rng() >= 0.2) continue;
     const x = room.x + Math.floor(rng() * room.width);
     const y = room.y + Math.floor(rng() * room.height);
     const maxAmount = Math.min(80, dungeonLevel * 16);
-    const amount = 2 + Math.floor(rng() * (maxAmount - 1));
+    const amount = 2 + Math.floor((rng() + rng() + rng()) / 3 * (maxAmount - 1));
     items.push({ x, y, amount });
   }
   return items;
