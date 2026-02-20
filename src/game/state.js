@@ -8,7 +8,7 @@ import { TILE } from '../dungeon/tiles.js';
 import { generate, createRng } from '../dungeon/generator.js';
 import { computeFov } from '../fov/index.js';
 import { findRoomContaining } from '../dungeon/room.js';
-import { createPlayer, xpToLevel, RANKS, REGEN_RATES } from './player.js';
+import { createPlayer, xpToLevel, RANKS, REGEN_RATES, HP_PER_RANK } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 import { generateDungeonItem } from './item.js';
@@ -283,6 +283,7 @@ export function dropItem(state, item) {
   const tileOccupied =
     tileType === TILE.STAIRS_UP ||
     tileType === TILE.STAIRS_DOWN ||
+    tileType === TILE.DOOR ||
     state.dungeonItems.some(d => d.x === x && d.y === y) ||
     state.goldItems.some(g => g.x === x && g.y === y);
   if (tileOccupied) {
@@ -357,8 +358,7 @@ export function quaffPotion(state, item) {
     case 'raise level': {
       const newLevel = Math.min(RANKS.length - 1, player.xpLevel + 1);
       if (newLevel > player.xpLevel) {
-        player.xpLevel = newLevel;
-        player.rank = RANKS[newLevel];
+        promotePlayer(player, player.xpLevel, newLevel);
         state.messages = [`You have earned the rank of ${player.rank}`];
       } else {
         state.messages = ['You feel more experienced'];
@@ -373,6 +373,100 @@ export function quaffPotion(state, item) {
 export function illuminateRoomAt(map, rooms, x, y) {
   const room = findRoomContaining(rooms, x, y);
   if (room?.illuminated) revealRoom(map, room);
+}
+
+/**
+ * Replace the current dungeon level with a newly generated one.
+ * Preserves the player object but updates position, dungeon, monsters, gold,
+ * and items. Recomputes FOV and illuminates the arrival room.
+ * @param {GameState} state
+ * @param {number} newLevel
+ * @param {(dungeon: import('../dungeon/generator.js').Dungeon) => {x:number,y:number}} getPos
+ * @param {string} message
+ */
+function changeDungeonLevel(state, newLevel, getPos, message) {
+  const newDungeon = generate({ dungeonLevel: newLevel });
+  const monsterRng = createRng();
+  const monsters = spawnMonsters(newDungeon, monsterRng, newLevel);
+  const goldItems = placeGoldItems(newDungeon.rooms, monsterRng, newLevel, newDungeon.stairsUp);
+  const dungeonItems = placeDungeonItems(newDungeon.rooms, monsterRng, newDungeon.stairsUp);
+  const { x, y } = getPos(newDungeon);
+  state.player.x = x;
+  state.player.y = y;
+  state.dungeon = newDungeon;
+  state.dungeonLevel = newLevel;
+  state.monsters = monsters;
+  state.goldItems = goldItems;
+  state.dungeonItems = dungeonItems;
+  state.messages = [message];
+  computeFov(newDungeon.map, state.player, SIGHT_RADIUS);
+  illuminateRoomAt(newDungeon.map, newDungeon.rooms, x, y);
+}
+
+/**
+ * Descend to the next dungeon level if the player stands on down-stairs.
+ * Replaces the dungeon, monsters, gold, and items; preserves the player.
+ * No-op if the player is not on a down-staircase.
+ * @param {GameState} state
+ */
+export function descendStairs(state) {
+  const { player, dungeon } = state;
+  if (dungeon.map[player.y][player.x].type !== TILE.STAIRS_DOWN) {
+    state.messages = ['You see no down staircase here'];
+    return;
+  }
+  const newLevel = state.dungeonLevel + 1;
+  changeDungeonLevel(state, newLevel, d => d.stairsUp, `You descend to dungeon level ${newLevel}`);
+}
+
+/**
+ * Ascend to the previous dungeon level if the player stands on up-stairs.
+ * On level 1, ends the game (player escaped). Preserves the player.
+ * No-op if the player is not on an up-staircase.
+ * @param {GameState} state
+ */
+export function ascendStairs(state) {
+  const { player, dungeon } = state;
+  if (dungeon.map[player.y][player.x].type !== TILE.STAIRS_UP) {
+    state.messages = ['You see no up staircase here'];
+    return;
+  }
+  if (state.dungeonLevel === 1) {
+    state.dead = true;
+    state.causeOfDeath = 'escaped the dungeon';
+    state.messages = ['You escape from the Dungeons of Doom!'];
+    return;
+  }
+  const newLevel = state.dungeonLevel - 1;
+  changeDungeonLevel(state, newLevel, d => d.stairsDown, `You ascend to dungeon level ${newLevel}`);
+}
+
+/**
+ * Promote the player from prevLevel to newLevel.
+ * Sums the max HP increases for every rank gained, scales current HP to the
+ * same percentage of the new max (rounded, minimum 1), and updates rank fields.
+ * @param {import('./player.js').Player} player
+ * @param {number} prevLevel
+ * @param {number} newLevel
+ */
+function promotePlayer(player, prevLevel, newLevel) {
+  const ratio = player.hp / player.maxHp;
+  for (let lv = prevLevel + 1; lv <= newLevel; lv++) player.maxHp += HP_PER_RANK[lv];
+  player.hp = Math.max(1, Math.round(ratio * player.maxHp));
+  player.xpLevel = newLevel;
+  player.rank = RANKS[newLevel];
+}
+
+/**
+ * Cheat: immediately promote the player one rank (no-op at max rank).
+ * @param {GameState} state
+ */
+export function cheatRankUp(state) {
+  const newLevel = Math.min(RANKS.length - 1, state.player.xpLevel + 1);
+  if (newLevel > state.player.xpLevel) {
+    promotePlayer(state.player, state.player.xpLevel, newLevel);
+    state.messages = [`[CHEAT] You have earned the rank of ${state.player.rank}`];
+  }
 }
 
 /**
@@ -417,11 +511,11 @@ export function movePlayer(state, dx, dy) {
       state.messages.push(PLAYER_HIT_MSGS[tier](target.name));
       if (target.hp <= 0) {
         player.xp += target.xp;
-        const prevRank = player.rank;
-        player.xpLevel = xpToLevel(player.xp);
-        player.rank = RANKS[player.xpLevel];
+        const prevLevel = player.xpLevel;
+        const newLevel = xpToLevel(player.xp);
         state.messages.push(`You have defeated the ${target.name}`);
-        if (player.rank !== prevRank) {
+        if (newLevel > prevLevel) {
+          promotePlayer(player, prevLevel, newLevel);
           state.messages.push(`You have earned the rank of ${player.rank}`);
         }
       }
