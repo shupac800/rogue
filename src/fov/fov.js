@@ -15,7 +15,7 @@ import { OCTANTS } from './octants.js';
  * @returns {boolean}
  */
 export function isBlocking(type) {
-  return type === TILE.VOID || type === TILE.WALL;
+  return type === TILE.VOID || type === TILE.WALL || type === TILE.DOOR;
 }
 
 /**

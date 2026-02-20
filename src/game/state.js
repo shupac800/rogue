@@ -12,7 +12,7 @@ import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
-export const SIGHT_RADIUS = 8;
+export const SIGHT_RADIUS = 1;
 
 /** Player-attack message for each hit tier (0 = glancing, 3 = devastating). */
 const PLAYER_HIT_MSGS = [

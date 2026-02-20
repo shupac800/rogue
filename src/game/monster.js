@@ -23,5 +23,5 @@
  * @returns {Monster}
  */
 export function createMonster(x, y) {
-  return { x, y, hp: 5, maxHp: 5, attack: 2, defense: 0, name: 'rat', char: 'r' };
+  return { x, y, hp: 2, maxHp: 2, attack: 2, defense: 0, name: 'rat', char: 'R' };
 }

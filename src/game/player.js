@@ -28,7 +28,7 @@ export function createPlayer(x, y) {
   return {
     x,
     y,
-    hp: 20,
+    hp: 4,
     maxHp: 20,
     attack: 3,
     defense: 1,
