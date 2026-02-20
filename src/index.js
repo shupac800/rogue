@@ -6,7 +6,7 @@
 
 import blessed from 'blessed';
 import { createScreen } from './render/screen.js';
-import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion } from './game/index.js';
+import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, descendStairs, ascendStairs } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
@@ -244,6 +244,18 @@ screen.on('keypress', (_ch, key) => {
 
   if (state.dead) {
     transitionToTombstone();
+    return;
+  }
+
+  if (_ch === '>') {
+    descendStairs(state);
+    afterTurn();
+    return;
+  }
+
+  if (_ch === '<') {
+    ascendStairs(state);
+    afterTurn();
     return;
   }
 

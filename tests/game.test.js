@@ -9,6 +9,8 @@ import {
   isWalkable,
   illuminateRoomAt,
   dropItem,
+  descendStairs,
+  ascendStairs,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
@@ -519,5 +521,107 @@ describe('HP regeneration', () => {
     state.turn = REGEN_RATES[3] - 1;
     movePlayer(state, 0, 0);
     expect(state.player.hp).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// descendStairs
+// ---------------------------------------------------------------------------
+
+describe('descendStairs', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); });
+
+  test('no-op when player is not on down-stairs', () => {
+    state.player.x = state.dungeon.stairsUp.x;
+    state.player.y = state.dungeon.stairsUp.y;
+    const levelBefore = state.dungeonLevel;
+    descendStairs(state);
+    expect(state.dungeonLevel).toBe(levelBefore);
+    expect(state.messages[0]).toMatch(/no down staircase/i);
+  });
+
+  test('increments dungeonLevel by 1', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    descendStairs(state);
+    expect(state.dungeonLevel).toBe(2);
+  });
+
+  test('places player on the up-stairs of the new level', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    descendStairs(state);
+    expect(state.player.x).toBe(state.dungeon.stairsUp.x);
+    expect(state.player.y).toBe(state.dungeon.stairsUp.y);
+  });
+
+  test('replaces monsters with a new set', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    const before = state.monsters;
+    descendStairs(state);
+    expect(state.monsters).not.toBe(before);
+  });
+
+  test('sets a descent message', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    descendStairs(state);
+    expect(state.messages[0]).toMatch(/descend/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ascendStairs
+// ---------------------------------------------------------------------------
+
+describe('ascendStairs', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); });
+
+  test('no-op when player is not on up-stairs', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    const levelBefore = state.dungeonLevel;
+    ascendStairs(state);
+    expect(state.dungeonLevel).toBe(levelBefore);
+    expect(state.messages[0]).toMatch(/no up staircase/i);
+  });
+
+  test('ends game when on level 1', () => {
+    state.player.x = state.dungeon.stairsUp.x;
+    state.player.y = state.dungeon.stairsUp.y;
+    ascendStairs(state);
+    expect(state.dead).toBe(true);
+    expect(state.causeOfDeath).toBe('escaped the dungeon');
+  });
+
+  test('escape message shown on level 1', () => {
+    state.player.x = state.dungeon.stairsUp.x;
+    state.player.y = state.dungeon.stairsUp.y;
+    ascendStairs(state);
+    expect(state.messages[0]).toMatch(/escape/i);
+  });
+
+  test('decrements dungeonLevel by 1 when above level 1', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    descendStairs(state); // now on level 2
+    state.player.x = state.dungeon.stairsUp.x;
+    state.player.y = state.dungeon.stairsUp.y;
+    ascendStairs(state); // back to level 1
+    expect(state.dungeonLevel).toBe(1);
+  });
+
+  test('places player on down-stairs of the new level', () => {
+    state.player.x = state.dungeon.stairsDown.x;
+    state.player.y = state.dungeon.stairsDown.y;
+    descendStairs(state); // level 2
+    state.player.x = state.dungeon.stairsUp.x;
+    state.player.y = state.dungeon.stairsUp.y;
+    ascendStairs(state); // back to level 1
+    expect(state.player.x).toBe(state.dungeon.stairsDown.x);
+    expect(state.player.y).toBe(state.dungeon.stairsDown.y);
   });
 });

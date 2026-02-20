@@ -376,6 +376,72 @@ export function illuminateRoomAt(map, rooms, x, y) {
 }
 
 /**
+ * Replace the current dungeon level with a newly generated one.
+ * Preserves the player object but updates position, dungeon, monsters, gold,
+ * and items. Recomputes FOV and illuminates the arrival room.
+ * @param {GameState} state
+ * @param {number} newLevel
+ * @param {(dungeon: import('../dungeon/generator.js').Dungeon) => {x:number,y:number}} getPos
+ * @param {string} message
+ */
+function changeDungeonLevel(state, newLevel, getPos, message) {
+  const newDungeon = generate({ dungeonLevel: newLevel });
+  const monsterRng = createRng();
+  const monsters = spawnMonsters(newDungeon, monsterRng, newLevel);
+  const goldItems = placeGoldItems(newDungeon.rooms, monsterRng, newLevel, newDungeon.stairsUp);
+  const dungeonItems = placeDungeonItems(newDungeon.rooms, monsterRng, newDungeon.stairsUp);
+  const { x, y } = getPos(newDungeon);
+  state.player.x = x;
+  state.player.y = y;
+  state.dungeon = newDungeon;
+  state.dungeonLevel = newLevel;
+  state.monsters = monsters;
+  state.goldItems = goldItems;
+  state.dungeonItems = dungeonItems;
+  state.messages = [message];
+  computeFov(newDungeon.map, state.player, SIGHT_RADIUS);
+  illuminateRoomAt(newDungeon.map, newDungeon.rooms, x, y);
+}
+
+/**
+ * Descend to the next dungeon level if the player stands on down-stairs.
+ * Replaces the dungeon, monsters, gold, and items; preserves the player.
+ * No-op if the player is not on a down-staircase.
+ * @param {GameState} state
+ */
+export function descendStairs(state) {
+  const { player, dungeon } = state;
+  if (dungeon.map[player.y][player.x].type !== TILE.STAIRS_DOWN) {
+    state.messages = ['You see no down staircase here'];
+    return;
+  }
+  const newLevel = state.dungeonLevel + 1;
+  changeDungeonLevel(state, newLevel, d => d.stairsUp, `You descend to dungeon level ${newLevel}`);
+}
+
+/**
+ * Ascend to the previous dungeon level if the player stands on up-stairs.
+ * On level 1, ends the game (player escaped). Preserves the player.
+ * No-op if the player is not on an up-staircase.
+ * @param {GameState} state
+ */
+export function ascendStairs(state) {
+  const { player, dungeon } = state;
+  if (dungeon.map[player.y][player.x].type !== TILE.STAIRS_UP) {
+    state.messages = ['You see no up staircase here'];
+    return;
+  }
+  if (state.dungeonLevel === 1) {
+    state.dead = true;
+    state.causeOfDeath = 'escaped the dungeon';
+    state.messages = ['You escape from the Dungeons of Doom!'];
+    return;
+  }
+  const newLevel = state.dungeonLevel - 1;
+  changeDungeonLevel(state, newLevel, d => d.stairsDown, `You ascend to dungeon level ${newLevel}`);
+}
+
+/**
  * Restore 1 HP if the player is alive, below max HP, and the turn count is
  * a multiple of the rank-appropriate regen rate. No-op otherwise.
  * @param {GameState} state
