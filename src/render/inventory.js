@@ -68,7 +68,7 @@ export function renderInventory(box, inventory, equippedArmor, equippedWeapon, s
       });
 
   const hints = getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon);
-  const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ or a-z to navigate', hints];
+  const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ to navigate', hints];
   const W = Math.max(...block.map(l => l.length));
   const hPad = ' '.repeat(Math.max(0, Math.floor((COLS - W) / 2)));
   const vPad = '\n'.repeat(Math.max(0, Math.floor((ROWS - block.length) / 2)));

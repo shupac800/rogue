@@ -155,9 +155,6 @@ screen.on('keypress', (_ch, key) => {
       inventoryIdx = Math.max(0, inventoryIdx - 1);
     } else if (keyName === 'down' || keyName === 'j') {
       inventoryIdx = Math.min(inv.length - 1, inventoryIdx + 1);
-    } else if (_ch && _ch >= 'a' && _ch <= 'z' && !['d', 'j', 'k', 'q', 'r', 'w'].includes(_ch)) {
-      const n = _ch.charCodeAt(0) - 97;
-      if (n < inv.length) inventoryIdx = n;
     } else if (_ch === 'd' && item && item !== state.player.equippedArmor && item !== state.player.equippedWeapon) {
       dropItem(state, item);
       screenState = 'game';
