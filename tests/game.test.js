@@ -18,7 +18,7 @@ import { TILE } from '../src/dungeon/tiles.js';
 describe('createPlayer', () => {
   test('returns an object with the correct shape', () => {
     const p = createPlayer(3, 5);
-    for (const key of ['x', 'y', 'hp', 'maxHp', 'attack', 'defense', 'gold', 'xp', 'level']) {
+    for (const key of ['x', 'y', 'hp', 'maxHp', 'attack', 'defense', 'gold', 'xp', 'xpLevel', 'rank']) {
       expect(p).toHaveProperty(key);
     }
   });
@@ -37,7 +37,8 @@ describe('createPlayer', () => {
     expect(p.defense).toBe(1);
     expect(p.gold).toBe(0);
     expect(p.xp).toBe(0);
-    expect(p.level).toBe(1);
+    expect(p.xpLevel).toBe(0);
+    expect(p.rank).toBe('Amateur');
   });
 
   test('returns distinct objects on each call', () => {

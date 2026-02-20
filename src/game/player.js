@@ -13,9 +13,24 @@
  *   defense: number,
  *   gold: number,
  *   xp: number,
- *   level: number
+ *   xpLevel: number,
+ *   rank: string
  * }} Player
  */
+
+/** Rank title for each xpLevel index. */
+export const RANKS = ['Amateur', 'Brawler'];
+
+/**
+ * Compute xpLevel from an xp value.
+ * 0 XP → level 0; 1+ XP → level 1 (table-driven, expand RANKS to add tiers).
+ * @param {number} xp
+ * @returns {number}
+ */
+export function xpToLevel(xp) {
+  if (xp <= 0) return 0;
+  return Math.min(RANKS.length - 1, 1);
+}
 
 /**
  * Create a new player entity at the given map position.
@@ -34,6 +49,7 @@ export function createPlayer(x, y) {
     defense: 1,
     gold: 0,
     xp: 0,
-    level: 1,
+    xpLevel: 0,
+    rank: RANKS[0],
   };
 }

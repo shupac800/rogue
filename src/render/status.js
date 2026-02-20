@@ -22,7 +22,7 @@ const STATS_WIDTH = 39;
  */
 function formatStats(player) {
   const hp   = `HP:${String(player.hp).padStart(3)}/${String(player.maxHp).padStart(3)}`;
-  const lv   = `Lv:${String(player.level).padStart(2)}`;
+  const lv   = `Lv:${String(player.xpLevel).padStart(2)}`;
   const xp   = `XP:${String(player.xp).padStart(5)}`;
   const gold = `Gold:${String(player.gold).padStart(5)}`;
   return [hp, lv, xp, gold].join('  ');
