@@ -19,13 +19,15 @@ const MISS_CHANCE = 0.25;
  * @returns {{ hit: boolean, damage: number, tier?: number }}
  */
 export function resolveCombat(attacker, defender, rng = Math.random) {
-  if (rng() < MISS_CHANCE) {
+  const hitBonus    = attacker.hitBonus    ?? 0;
+  const damageBonus = attacker.damageBonus ?? 0;
+  if (rng() < Math.max(0, MISS_CHANCE - hitBonus * 0.05)) {
     return { hit: false, damage: 0 };
   }
   const maxRaw = attacker.attack * 4;
-  const rawDamage = 1 + Math.floor(rng() * maxRaw);
-  const damage = Math.max(1, rawDamage - defender.defense);
-  const tier = Math.min(3, Math.floor((rawDamage - 1) / attacker.attack));
+  const baseRaw = 1 + Math.floor(rng() * maxRaw);
+  const damage = Math.max(1, baseRaw - defender.defense + damageBonus);
+  const tier = Math.min(3, Math.floor((baseRaw - 1) / attacker.attack));
   defender.hp -= damage;
   return { hit: true, damage, tier };
 }

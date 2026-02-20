@@ -28,6 +28,20 @@ const ATTR = {
   GOLD:    (1 << 18) | (3 << 9) | 0,  // bold + yellow fg (3), black bg
 };
 
+/**
+ * Render info (char + attr) for each dungeon item type.
+ * Classic Rogue ASCII: food=:  potion=!  scroll=?  weapon=)  armor=]  ring==  wand=/
+ */
+const ITEM_RENDER = {
+  food:   { ch: ':', attr: (7 << 9) | 0 },                     // white
+  potion: { ch: '!', attr: (5 << 9) | 0 },                     // magenta
+  scroll: { ch: '?', attr: (1 << 18) | (7 << 9) | 0 },         // bold white
+  weapon: { ch: ')', attr: (6 << 9) | 0 },                     // cyan
+  armor:  { ch: ']', attr: (6 << 9) | 0 },                     // cyan
+  ring:   { ch: '=', attr: (1 << 18) | (3 << 9) | 0 },         // bold yellow
+  wand:   { ch: '/', attr: (2 << 9) | 0 },                     // green
+};
+
 /** Box-drawing character lookup: key is 'UDLR' (1=WALL neighbor, 0=other). */
 const BOX_CHAR = {
   '0000': '#',
@@ -128,8 +142,9 @@ function cellInfo(map, x, y, isPlayer) {
  * @param {{x:number,y:number}} player
  * @param {import('../game/monster.js').Monster[]} monsters
  * @param {import('../game/state.js').GoldItem[]} goldItems
+ * @param {import('../game/state.js').DungeonItem[]} dungeonItems
  */
-export function renderMap(screen, dungeon, player, monsters, goldItems) {
+export function renderMap(screen, dungeon, player, monsters, goldItems, dungeonItems) {
   const { map, width, height } = dungeon;
 
   const monsterMap = new Map();
@@ -137,6 +152,10 @@ export function renderMap(screen, dungeon, player, monsters, goldItems) {
     if (m.hp > 0) monsterMap.set(`${m.x},${m.y}`, m.char);
   }
   const goldSet = new Set(goldItems.map(g => `${g.x},${g.y}`));
+  const itemMap = new Map();
+  for (const { x, y, item } of dungeonItems) {
+    itemMap.set(`${x},${y}`, ITEM_RENDER[item.type]);
+  }
 
   for (let y = 0; y < height; y++) {
     if (!screen.lines[y]) continue;
@@ -149,6 +168,9 @@ export function renderMap(screen, dungeon, player, monsters, goldItems) {
         screen.lines[y][x] = [ATTR.MONSTER, monsterChar];
       } else if (!isPlayer && cell.visible && goldSet.has(`${x},${y}`)) {
         screen.lines[y][x] = [ATTR.GOLD, '$'];
+      } else if (!isPlayer && cell.visible && itemMap.has(`${x},${y}`)) {
+        const { ch, attr } = itemMap.get(`${x},${y}`);
+        screen.lines[y][x] = [attr, ch];
       } else {
         const { ch, attr } = cellInfo(map, x, y, isPlayer);
         screen.lines[y][x] = [attr, ch];

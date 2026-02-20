@@ -3,7 +3,7 @@
  * Player entity factory. No project dependencies.
  */
 
-import { createWeapon, createFood } from './item.js';
+import { createWeapon, createFood, createArmor } from './item.js';
 
 /**
  * @typedef {{
@@ -12,7 +12,12 @@ import { createWeapon, createFood } from './item.js';
  *   hp: number,
  *   maxHp: number,
  *   attack: number,
+ *   baseDefense: number,
  *   defense: number,
+ *   equippedWeapon: import('./item.js').WeaponItem | null,
+ *   hitBonus: number,
+ *   damageBonus: number,
+ *   equippedArmor: import('./item.js').ArmorItem | null,
  *   gold: number,
  *   xp: number,
  *   xpLevel: number,
@@ -43,19 +48,27 @@ export function xpToLevel(xp) {
  * @returns {Player}
  */
 export function createPlayer(x, y) {
+  const sword = createWeapon('+1/+1 sword', 1, 1);
+  const leatherArmor = createArmor('leather armor', 3);
   return {
     x,
     y,
     hp: 4,
     maxHp: 20,
     attack: 3,
-    defense: 1,
+    hitBonus: sword.hitBonus,
+    damageBonus: sword.damageBonus,
+    equippedWeapon: sword,
+    baseDefense: 1,
+    defense: 1 + leatherArmor.ac,
+    equippedArmor: leatherArmor,
     gold: 0,
     xp: 0,
     xpLevel: 0,
     rank: RANKS[0],
     inventory: [
-      createWeapon('+1/+1 sword', 1, 1),
+      sword,
+      leatherArmor,
       createFood('food ration'),
     ],
   };

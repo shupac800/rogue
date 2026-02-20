@@ -11,6 +11,7 @@ import { findRoomContaining } from '../dungeon/room.js';
 import { createPlayer, xpToLevel, RANKS } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
+import { generateDungeonItem } from './item.js';
 
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 1;
@@ -44,6 +45,7 @@ export function isWalkable(type) {
 
 /**
  * @typedef {{ x: number, y: number, amount: number }} GoldItem
+ * @typedef {{ x: number, y: number, item: import('./item.js').Item }} DungeonItem
  */
 
 /**
@@ -55,6 +57,7 @@ export function isWalkable(type) {
  *   turn: number,
  *   monsters: import('./monster.js').Monster[],
  *   goldItems: GoldItem[],
+ *   dungeonItems: DungeonItem[],
  *   messages: string[],
  *   dead: boolean,
  *   causeOfDeath: string|null
@@ -102,6 +105,45 @@ function pickupGold(state, x, y) {
 }
 
 /**
+ * Place items randomly in rooms. Each room has a 50% chance of no item;
+ * among rooms that get one, food is most common and wands are rarest.
+ * Never places an item at the player's starting position (stairsUp).
+ * @param {import('../dungeon/room.js').Room[]} rooms
+ * @param {() => number} rng
+ * @param {{ x: number, y: number }} stairsUp
+ * @returns {DungeonItem[]}
+ */
+function placeDungeonItems(rooms, rng, stairsUp) {
+  const items = [];
+  for (const room of rooms) {
+    const item = generateDungeonItem(rng);
+    if (!item) continue;
+    const x = room.x + Math.floor(rng() * room.width);
+    const y = room.y + Math.floor(rng() * room.height);
+    if (x === stairsUp.x && y === stairsUp.y) continue;
+    items.push({ x, y, item });
+  }
+  return items;
+}
+
+/**
+ * If a dungeon item exists at (x, y), move it to player inventory and push
+ * a pickup message. No-op if no item is at that position.
+ * @param {GameState} state
+ * @param {number} x
+ * @param {number} y
+ */
+function pickupDungeonItem(state, x, y) {
+  const idx = state.dungeonItems.findIndex(d => d.x === x && d.y === y);
+  if (idx === -1) return;
+  const { item } = state.dungeonItems[idx];
+  state.player.inventory.push(item);
+  state.dungeonItems.splice(idx, 1);
+  const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
+  state.messages.push(`You pick up ${article} ${item.name}`);
+}
+
+/**
  * Create a new game state for a fresh dungeon level.
  * Generates the dungeon, places the player on the up-stairs, and computes
  * the initial field of view.
@@ -115,9 +157,10 @@ export function createGame(options = {}) {
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng, dungeonLevel);
   const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel, dungeon.stairsUp);
+  const dungeonItems = placeDungeonItems(dungeon.rooms, monsterRng, dungeon.stairsUp);
   const playerName = options.playerName ?? 'Adventurer';
   const welcomeMessage = 'Welcome to the Dungeons of Doom';
-  const state = { dungeon, player, playerName, dungeonLevel, turn: 0, monsters, goldItems, messages: [welcomeMessage, `Good luck ${playerName}!`], dead: false, causeOfDeath: null };
+  const state = { dungeon, player, playerName, dungeonLevel, turn: 0, monsters, goldItems, dungeonItems, messages: [welcomeMessage, `Good luck ${playerName}!`], dead: false, causeOfDeath: null };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
   return state;
@@ -161,6 +204,101 @@ function handleDeath(state) {
   if (state.player.hp > 0 || state.dead) return;
   state.dead = true;
   state.messages.push('You died');
+}
+
+/**
+ * Recompute player.defense from baseDefense plus any equipped armor.
+ * @param {import('./player.js').Player} player
+ */
+function recomputeDefense(player) {
+  player.defense = player.baseDefense + (player.equippedArmor?.ac ?? 0);
+}
+
+/**
+ * Recompute player.hitBonus and player.damageBonus from equipped weapon.
+ * @param {import('./player.js').Player} player
+ */
+function recomputeWeapon(player) {
+  player.hitBonus    = player.equippedWeapon?.hitBonus    ?? 0;
+  player.damageBonus = player.equippedWeapon?.damageBonus ?? 0;
+}
+
+/**
+ * Wield a weapon, replacing any currently wielded weapon.
+ * @param {GameState} state
+ * @param {import('./item.js').WeaponItem} weapon
+ */
+export function wieldWeapon(state, weapon) {
+  state.player.equippedWeapon = weapon;
+  recomputeWeapon(state.player);
+  state.messages = [`You wield ${weapon.name}`];
+}
+
+/**
+ * Stow the currently wielded weapon. No-op if none is wielded.
+ * @param {GameState} state
+ */
+export function unwieldWeapon(state) {
+  if (!state.player.equippedWeapon) return;
+  const { name } = state.player.equippedWeapon;
+  state.player.equippedWeapon = null;
+  recomputeWeapon(state.player);
+  state.messages = [`You put away ${name}`];
+}
+
+/**
+ * Equip an armor item, replacing any currently worn armor.
+ * Recomputes player.defense and sets state.messages.
+ * @param {GameState} state
+ * @param {import('./item.js').ArmorItem} armor
+ */
+export function wearArmor(state, armor) {
+  state.player.equippedArmor = armor;
+  recomputeDefense(state.player);
+  state.messages = [`You are now wearing ${armor.name}`];
+}
+
+/**
+ * Remove the currently worn armor. No-op if no armor is equipped.
+ * Recomputes player.defense and sets state.messages.
+ * @param {GameState} state
+ */
+export function removeArmor(state) {
+  if (!state.player.equippedArmor) return;
+  const { name } = state.player.equippedArmor;
+  state.player.equippedArmor = null;
+  recomputeDefense(state.player);
+  state.messages = [`You remove ${name}`];
+}
+
+/**
+ * Drop an item from the player's inventory onto the current tile.
+ * If the item is equipped armor, it is removed first.
+ * @param {GameState} state
+ * @param {import('./item.js').Item} item
+ */
+export function dropItem(state, item) {
+  const { x, y } = state.player;
+  const tileType = state.dungeon.map[y][x].type;
+  const tileOccupied =
+    tileType === TILE.STAIRS_UP ||
+    tileType === TILE.STAIRS_DOWN ||
+    state.dungeonItems.some(d => d.x === x && d.y === y) ||
+    state.goldItems.some(g => g.x === x && g.y === y);
+  if (tileOccupied) {
+    state.messages = ["Can't drop that here"];
+    return;
+  }
+  const idx = state.player.inventory.indexOf(item);
+  if (idx === -1) return;
+  if (item === state.player.equippedArmor) {
+    state.player.equippedArmor = null;
+    recomputeDefense(state.player);
+  }
+  state.player.inventory.splice(idx, 1);
+  state.dungeonItems.push({ x, y, item });
+  const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
+  state.messages = [`You drop ${article} ${item.name}`];
 }
 
 export function illuminateRoomAt(map, rooms, x, y) {
@@ -217,6 +355,7 @@ export function movePlayer(state, dx, dy) {
     illuminateRoomAt(map, dungeon.rooms, nx + dx, ny + dy);
   }
   pickupGold(state, nx, ny);
+  pickupDungeonItem(state, nx, ny);
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);

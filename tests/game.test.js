@@ -20,7 +20,7 @@ import { findRoomContaining } from '../src/dungeon/room.js';
 describe('createPlayer', () => {
   test('returns an object with the correct shape', () => {
     const p = createPlayer(3, 5);
-    for (const key of ['x', 'y', 'hp', 'maxHp', 'attack', 'defense', 'gold', 'xp', 'xpLevel', 'rank']) {
+    for (const key of ['x', 'y', 'hp', 'maxHp', 'attack', 'defense', 'gold', 'xp', 'xpLevel', 'rank', 'equippedWeapon', 'hitBonus', 'damageBonus']) {
       expect(p).toHaveProperty(key);
     }
   });
@@ -36,7 +36,7 @@ describe('createPlayer', () => {
     expect(p.hp).toBe(4);
     expect(p.maxHp).toBe(20);
     expect(p.attack).toBe(3);
-    expect(p.defense).toBe(1);
+    expect(p.defense).toBe(4); // baseDefense 1 + leather armor AC 3
     expect(p.gold).toBe(0);
     expect(p.xp).toBe(0);
     expect(p.xpLevel).toBe(0);

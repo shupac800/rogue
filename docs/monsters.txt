@@ -1,0 +1,76 @@
+{{Header Nav|game=Rogue}}
+'''Monsters''' in Rogue are represented by capital letters. Each race of monsters is assigned a single letter, and there are 26 different monsters. 
+
+==Legend==
+===Stats===
+* '''Level''' is the level of the monster.
+* '''AC''' is the monster's armor class. A monster with lower AC is harder to hit.
+* '''Treasure''' is the percent chance that a monster will be carrying treasure.
+===Flags===
+There are five special properties that a monster can have.
+* '''M''' for "mean". Mean monsters may attack without provocation.
+* '''F''' for "flying". Flying monsters are more difficult to hit.
+* '''R''' for "regeneration". These monsters can regenerate health.
+* '''G''' for "greedy". Greedy monsters attempt to pick up gold when you enter a room.
+* '''I''' for "invisible".
+
+
+== Monsters ==
+{| {{prettytable}}
+|+ List of Monsters (Original)
+! Name || Treasure || Flags || Exp || HP || AC || Damage || Range || Notes
+|-
+|Aquator       ||   0 || M  || 20   ||  5d8 ||  2 || 0d0/0d0 || || Rusts armor 
+|-
+|Bat           ||   0 || F  || 1    ||  1d8 ||  3 || 1d2 || || Flies randomly
+|-
+|Centaur       ||  15 ||     || 17   ||  4d8 ||  4 || 1d2/1d5/1d5 || || 
+|-
+|Dragon        || 100 || M  || 5000 || 10d8 || -1 || 1d8/1d8/3d10 || || Ranged 6d6 flame attack
+|-
+|Emu           ||   0 || M   || 2    ||  1d8 ||  7 || 1d2  || || 
+|-
+|Venus Flytrap ||   0 || M   || 80   ||  8d8 ||  3 || special || || Traps player
+|-
+|Griffin       ||  20 || MFR || 2000 || 13d8 ||  2 || 4d3/3d5 || || 
+|-
+|Hobgoblin     ||   0 || M   || 3    ||  1d8 ||  5 || 1d8 || || 
+|-
+|Ice monster   ||   0 ||     || 5    ||  1d8 ||  9 || 0d0 || || Freezes player
+|-
+|Jabberwock    ||  70 ||     || 3000 || 15d8 ||  6 || 2d12/2d4 || || 
+|-
+|Kestrel       ||   0 || MF  ||  1   ||  1d8 ||  7 || 1d4 || || 
+|-
+|Leprechaun    ||   0 ||     || 10   ||  3d8 ||  8 || 1d1 || || Steals gold
+|-
+|Medusa        ||  40 || M   || 200  ||  8d8 ||  2 || 3d4/3d4/2d5 || || Confuses Hero
+|-
+|Nymph         || 100 ||     || 37   ||  3d8 ||  9 || 0d0 || || Steals magic item
+|-
+|Orc           ||  15 || G   || 5    ||  1d8 ||  6 || 1d8 || || Greedy - runs toward gold
+|-
+|Phantom       ||   0 || I   || 120  ||  8d8 ||  3 || 4d4 || || Invisible
+|-
+|Quagga        ||   0 || M  || 15   ||  3d8 ||  3 || 1d5/1d5 || || 
+|-
+|Rattlesnake   ||   0 || M  || 9    ||  2d8 ||  3 || 1d6 || || Reduces Strength
+|-
+|Snake         ||   0 || M  || 2    ||  1d8 ||  5 || 1d3 || || 
+|-
+|Troll         ||  50 || RM  || 120  ||  6d8 ||  4 || 1d8/1d8/2d6 || || 
+|-
+|Ur-vile       ||   0 || M   || 190  ||  7d8 || -2 || 1d9/1d9/2d9 || || 
+|-
+|Vampire       ||  20 || RM  || 350  ||  8d8 ||  1 || 1d10 || || Drains Max HP
+|-
+|Wraith        ||   0 ||     || 55   ||  5d8 ||  4 || 1d6 || || Drains exp
+|-
+|Xeroc         ||  30 ||     || 100  ||  7d8 ||  7 || 4d4 || || Imitates an object
+|-
+|Yeti          ||  30 ||     || 50   ||  4d8 ||  6 || 1d6/1d6 || || 
+|-
+|Zombie        ||   0 || M   || 6    ||  2d8 ||  8 || 1d8 || || 
+|}
+
+{{Footer Nav|game=Rogue|prevpage=Walkthrough|nextpage=Items}}

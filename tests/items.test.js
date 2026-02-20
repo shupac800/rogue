@@ -61,8 +61,8 @@ describe('player starting inventory', () => {
     expect(Array.isArray(player.inventory)).toBe(true);
   });
 
-  test('player starts with exactly two items', () => {
-    expect(player.inventory.length).toBe(2);
+  test('player starts with exactly three items', () => {
+    expect(player.inventory.length).toBe(3);
   });
 
   test('first item is the +1/+1 sword', () => {
@@ -72,9 +72,34 @@ describe('player starting inventory', () => {
     expect(sword.damageBonus).toBe(1);
   });
 
-  test('second item is a food ration', () => {
-    const food = player.inventory[1];
+  test('second item is leather armor', () => {
+    const armor = player.inventory[1];
+    expect(armor.type).toBe('armor');
+    expect(armor.name).toBe('leather armor');
+    expect(armor.ac).toBe(3);
+  });
+
+  test('third item is a food ration', () => {
+    const food = player.inventory[2];
     expect(food.type).toBe('food');
     expect(food.name).toBe('food ration');
+  });
+
+  test('player starts wearing leather armor', () => {
+    expect(player.equippedArmor).toBe(player.inventory[1]);
+  });
+
+  test('player defense equals baseDefense + leather armor AC', () => {
+    expect(player.baseDefense).toBe(1);
+    expect(player.defense).toBe(4); // 1 + 3
+  });
+
+  test('player starts wielding the sword', () => {
+    expect(player.equippedWeapon).toBe(player.inventory[0]);
+  });
+
+  test('player hitBonus and damageBonus reflect the wielded sword', () => {
+    expect(player.hitBonus).toBe(1);
+    expect(player.damageBonus).toBe(1);
   });
 });

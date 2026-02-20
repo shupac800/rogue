@@ -1,0 +1,124 @@
+Source: https://strategywiki.org/wiki/Rogue/Items
+
+== Weapons ==
+
+| Weapon           | Damage | Notes                              |
+|------------------|--------|------------------------------------|
+| Mace             | 2d4    |                                    |
+| Long sword       | 3d4    |                                    |
+| Short bow        | 1d1    |                                    |
+| Arrow            | 2d3    | Takes bonuses from equipped bow    |
+| Dagger           | 1d6    | 1d4 when thrown                    |
+| Two handed sword | 4d4    |                                    |
+| Dart             | 1d3    | Thrown only                        |
+| Shuriken         | 2d4    | Thrown only                        |
+| Spear            | 2d3    | 1d6 when thrown                    |
+
+== Armor ==
+
+A higher AC gives a better chance to avoid damage.
+Older versions used decreasing AC to represent better armor.
+
+| Name             | AC (v5) | AC (old) |
+|------------------|---------|----------|
+| Leather          | 3       | 8        |
+| Ring mail        | 4       | 7        |
+| Studded leather  | 4       | 7        |
+| Scale mail       | 5       | 6        |
+| Chain mail       | 6       | 5        |
+| Splint mail      | 7       | 4        |
+| Banded mail      | 7       | 4        |
+| Plate mail       | 8       | 3        |
+
+== Scrolls (23 types) ==
+
+Some scrolls require certain conditions to be met.
+If they aren't, you see: "you feel a strange sense of loss."
+
+| Scroll                        | Effect                                                                        |
+|-------------------------------|-------------------------------------------------------------------------------|
+| Monster confusion             | "Your hands begin to glow red." Next melee attack confuses the target.        |
+| Magic mapping                 | Reveals the entire map layout; objects still hidden.                           |
+| Hold monster                  | Freezes all adjacent monsters.                                                 |
+| Sleep                         | Puts the reader to sleep for 4-8 turns.                                        |
+| Enchant armor                 | "Your armor glows silver for a moment." +1 protection, removes armor curse.   |
+| Identify                      | Identifies any object.                                                         |
+| Identify potion               | Identifies a potion. (v5.4.4+)                                                 |
+| Identify scroll               | Identifies a scroll. (v5.4.4+)                                                 |
+| Identify weapon               | Identifies a weapon. (v5.4.4+)                                                 |
+| Identify armor                | Identifies armor. (v5.4.4+)                                                    |
+| Identify ring, wand or staff  | Identifies a ring, wand, or staff.                                             |
+| Scare monster                 | "You hear maniacal laughter in the distance." Drop it; monsters won't step on it. |
+| Food detection                | "Your nose tingles." Detects food on the current level.                        |
+| Teleportation                 | Teleports reader to a random location on the map.                              |
+| Enchant weapon                | "Your weapon glows blue for a moment." +1 hit or damage, removes weapon curse.|
+| Create monster                | Summons a monster on an adjacent tile.                                         |
+| Remove curse                  | "You feel as if somebody is watching over you." Removes curses from equipped items. |
+| Aggravate monsters            | "You hear a high pitched humming noise." Alerts all monsters on the level.    |
+| Blank paper                   | Does nothing.                                                                  |
+| Protect armor                 | "Your armor is covered by a shimmering gold shield." Prevents rust from Aquators. |
+| Light                         | Illuminates the current room. (Removed in later versions)                      |
+
+== Potions (14 types) ==
+
+| Potion             | Effect                                                                                 |
+|--------------------|----------------------------------------------------------------------------------------|
+| Confusion          | Confuses the player for 19-21 turns.                                                   |
+| Paralysis          | Paralyzes the player. (v3.6 and earlier)                                               |
+| Hallucination      | Causes hallucinations for 850 turns; can't recognize monsters or items. (v5+)          |
+| Poison             | Reduces strength by 1-3 points.                                                        |
+| Gain strength      | Increases strength by 1.                                                               |
+| See invisible      | "This potion tastes like slime mold juice." Reveals Phantoms.                          |
+| Healing            | Heals 1d4 per character level. Increases max HP by 1 if at full health.               |
+| Monster detection  | Reveals all monsters on the map.                                                       |
+| Magic detection    | Reveals all magic items on the map.                                                    |
+| Raise level        | Increases experience level by 1.                                                       |
+| Extra healing      | Heals 1d8 per character level. Increases max HP by 1 (or 2 if at full health).        |
+| Haste self         | Hastens the player for 4-8 turns.                                                      |
+| Restore strength   | "Hey, this tastes great. It makes you feel warm all over." Restores strength to max.  |
+| Blindness          | Blinds player for 807-892 turns.                                                       |
+| Levitation         | Levitates for 29-32 turns.                                                             |
+| Thirst quenching   | Does nothing.                                                                          |
+
+== Rings (14 types) ==
+
+Bonus rings give either +1 or +2, but may be cursed and give -1 instead.
+
+| Ring               | Effect                                                                     |
+|--------------------|----------------------------------------------------------------------------|
+| Protection         | Adds to defense and magical saving throws.                                 |
+| Add strength       | Adds to strength.                                                          |
+| Sustain strength   | Prevents poison from reducing strength.                                    |
+| Searching          | Helps detect secret doors and traps.                                       |
+| See invisible      | Reveals Phantoms.                                                          |
+| Adornment          | Worth 10 gold. No other effect.                                            |
+| Aggravate monster  | Cursed. Causes monsters to attack more aggressively.                       |
+| Dexterity          | Improves weapon accuracy.                                                  |
+| Increase damage    | Increases weapon damage.                                                   |
+| Regeneration       | Heals 1 hp per turn.                                                       |
+| Slow digestion     | Reduces food consumption ~50%. Two rings can cancel food consumption.      |
+| Teleportation      | Cursed. Randomly teleports the player around the map.                      |
+| Stealth            | Allows movement without rousing sleeping monsters.                         |
+| Maintain armor     | Prevents rust damage from Aquators. (v5.3+)                               |
+
+== Rods / Wands / Staffs (14 types) ==
+
+Rods normally appear with 3-7 charges (Light rods have 10-19).
+Rods come as either wands or staffs; the differences are minor.
+
+| Rod                | Effect                                                                           |
+|--------------------|----------------------------------------------------------------------------------|
+| Light              | Illuminates the current room. (10-19 charges)                                    |
+| Invisibility       | Makes a monster invisible.                                                        |
+| Lightning          | 6d6 damage, up to 6 tiles. Bounces off walls.                                    |
+| Fire               | 6d6 damage, up to 6 tiles. Bounces off walls. Dragons are immune.                |
+| Cold               | 6d6 damage, up to 6 tiles. Bounces off walls. Yetis are immune.                  |
+| Polymorph          | Changes a monster's type randomly.                                                |
+| Magic missile      | 1d4 damage to a single target.                                                    |
+| Haste monster      | Hastens a monster.                                                                |
+| Slow monster       | Slows a monster.                                                                  |
+| Drain life         | Drains half of player's hp; removes the same total from all visible monsters.    |
+| Nothing            | Does nothing.                                                                     |
+| Teleport away      | Teleports a monster to a random location on the map.                              |
+| Teleport to        | Causes a monster to teleport next to the player.                                  |
+| Cancellation       | Suppresses a monster's special abilities.                                         |
