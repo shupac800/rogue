@@ -82,7 +82,7 @@ export function movePlayer(state, dx, dy) {
   if (target) {
     resolveCombat(player, target);
     state.monsters = monsters.filter(m => m.hp > 0);
-    state.message = `You hit the ${target.name}`;
+    state.message = target.hp <= 0 ? `You kill the ${target.name}` : `You hit the ${target.name}`;
     state.turn += 1;
     computeFov(map, player, SIGHT_RADIUS);
     return;
@@ -94,4 +94,5 @@ export function movePlayer(state, dx, dy) {
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);
+  if (player.hp <= 0) state.message = 'You died';
 }

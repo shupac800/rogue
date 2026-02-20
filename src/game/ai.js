@@ -76,6 +76,7 @@ export function stepMonsters(state) {
 
       if (tx === player.x && ty === player.y) {
         resolveCombat(m, player);
+        state.message = `The ${m.name} hits you`;
         break;
       }
 
