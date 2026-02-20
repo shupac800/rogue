@@ -2,7 +2,7 @@
  * Tests for src/game/player.js and src/game/state.js
  */
 
-import { createPlayer } from '../src/game/player.js';
+import { createPlayer, REGEN_RATES } from '../src/game/player.js';
 import {
   createGame,
   movePlayer,
@@ -465,5 +465,59 @@ describe('dropItem', () => {
     const before = state.player.inventory.length;
     dropItem(state, armor);
     expect(state.player.inventory.length).toBe(before - 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HP regeneration
+// ---------------------------------------------------------------------------
+
+describe('HP regeneration', () => {
+  let state;
+  beforeEach(() => {
+    state = createGame({ seed: 42 });
+    state.monsters = [];
+    state.player.hp = 1; // damaged
+  });
+
+  test('REGEN_RATES has one entry per rank and decreases with level', () => {
+    expect(REGEN_RATES).toHaveLength(4);
+    for (let i = 1; i < REGEN_RATES.length; i++) {
+      expect(REGEN_RATES[i]).toBeLessThan(REGEN_RATES[i - 1]);
+    }
+  });
+
+  test('restores 1 HP when turn count reaches the regen rate', () => {
+    state.turn = REGEN_RATES[0] - 1;
+    movePlayer(state, 0, 0); // turn becomes REGEN_RATES[0]
+    expect(state.player.hp).toBe(2);
+  });
+
+  test('does not restore HP on a turn that is not a rate multiple', () => {
+    state.turn = 0; // turn will become 1, not a multiple of 40
+    movePlayer(state, 0, 0);
+    expect(state.player.hp).toBe(1);
+  });
+
+  test('does not restore HP when already at max', () => {
+    state.player.hp = state.player.maxHp;
+    state.turn = REGEN_RATES[0] - 1;
+    movePlayer(state, 0, 0);
+    expect(state.player.hp).toBe(state.player.maxHp);
+  });
+
+  test('does not restore HP when player is dead', () => {
+    state.player.hp = 0;
+    state.dead = true;
+    state.turn = REGEN_RATES[0] - 1;
+    movePlayer(state, 0, 0);
+    expect(state.player.hp).toBe(0);
+  });
+
+  test('higher xpLevel uses a faster (lower) regen rate', () => {
+    state.player.xpLevel = 3; // Adventurer: rate = 10
+    state.turn = REGEN_RATES[3] - 1;
+    movePlayer(state, 0, 0);
+    expect(state.player.hp).toBe(2);
   });
 });

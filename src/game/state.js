@@ -8,7 +8,7 @@ import { TILE } from '../dungeon/tiles.js';
 import { generate, createRng } from '../dungeon/generator.js';
 import { computeFov } from '../fov/index.js';
 import { findRoomContaining } from '../dungeon/room.js';
-import { createPlayer, xpToLevel, RANKS } from './player.js';
+import { createPlayer, xpToLevel, RANKS, REGEN_RATES } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 import { generateDungeonItem } from './item.js';
@@ -376,6 +376,18 @@ export function illuminateRoomAt(map, rooms, x, y) {
 }
 
 /**
+ * Restore 1 HP if the player is alive, below max HP, and the turn count is
+ * a multiple of the rank-appropriate regen rate. No-op otherwise.
+ * @param {GameState} state
+ */
+function regenHp(state) {
+  const { player } = state;
+  if (state.dead || player.hp >= player.maxHp) return;
+  const rate = REGEN_RATES[player.xpLevel];
+  if (state.turn % rate === 0) player.hp += 1;
+}
+
+/**
  * Attempt to move the player by (dx, dy).
  * Mutates state in place. Turn only advances on a valid move (including wait).
  * Returns early without mutating if the destination is out of bounds or blocked.
@@ -419,6 +431,7 @@ export function movePlayer(state, dx, dy) {
     computeFov(map, player, SIGHT_RADIUS);
     stepMonsters(state);
     handleDeath(state);
+    regenHp(state);
     return;
   }
 
@@ -433,4 +446,5 @@ export function movePlayer(state, dx, dy) {
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);
   handleDeath(state);
+  regenHp(state);
 }

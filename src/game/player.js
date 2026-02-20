@@ -32,6 +32,9 @@ export const RANKS = ['Apprentice', 'Guild Novice', 'Journeyman', 'Adventurer'];
 /** Minimum XP required for each rank level. */
 const XP_THRESHOLDS = [0, 5, 20, 80];
 
+/** HP regen period (turns) for each xpLevel. Lower = faster. */
+export const REGEN_RATES = [40, 30, 20, 10];
+
 /**
  * Compute xpLevel from an xp value using XP_THRESHOLDS.
  * Returns the highest level whose threshold is met.
