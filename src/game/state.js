@@ -110,7 +110,7 @@ export function createGame(options = {}) {
   const dungeon = generate(options);
   const player = createPlayer(dungeon.stairsUp.x, dungeon.stairsUp.y);
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
-  const monsters = spawnMonsters(dungeon, monsterRng);
+  const monsters = spawnMonsters(dungeon, monsterRng, dungeonLevel);
   const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel);
   const playerName = options.playerName ?? 'Adventurer';
   const welcomeMessage = 'Welcome to the Dungeons of Doom';

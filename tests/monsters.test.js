@@ -2,11 +2,14 @@
  * Tests for monster.js, combat.js, and ai.js
  */
 
-import { createMonster } from '../src/game/monster.js';
+import { MONSTER_TABLE, monstersForLevel, createMonster } from '../src/game/monster.js';
 import { resolveCombat } from '../src/game/combat.js';
 import { spawnMonsters, stepMonsters } from '../src/game/ai.js';
 import { generate } from '../src/dungeon/generator.js';
 import { TILE } from '../src/dungeon/tiles.js';
+
+/** Bat template — level 1, simple stats. */
+const BAT = MONSTER_TABLE.find(m => m.name === 'Bat');
 
 // ---------------------------------------------------------------------------
 // createMonster
@@ -14,34 +17,72 @@ import { TILE } from '../src/dungeon/tiles.js';
 
 describe('createMonster', () => {
   test('returns an object with the correct shape', () => {
-    const m = createMonster(3, 5);
+    const m = createMonster(BAT, 3, 5);
     for (const key of ['x', 'y', 'hp', 'maxHp', 'attack', 'defense', 'name', 'char']) {
       expect(m).toHaveProperty(key);
     }
   });
 
   test('places the monster at the given coordinates', () => {
-    const m = createMonster(7, 12);
+    const m = createMonster(BAT, 7, 12);
     expect(m.x).toBe(7);
     expect(m.y).toBe(12);
   });
 
-  test('sets correct starting stats', () => {
-    const m = createMonster(0, 0);
-    expect(m.hp).toBe(2);
-    expect(m.maxHp).toBe(2);
-    expect(m.attack).toBe(2);
-    expect(m.defense).toBe(0);
-    expect(m.name).toBe('rat');
-    expect(m.char).toBe('R');
+  test('sets correct starting stats from template', () => {
+    const m = createMonster(BAT, 0, 0);
+    expect(m.hp).toBe(BAT.hp);
+    expect(m.maxHp).toBe(BAT.hp);
+    expect(m.attack).toBe(BAT.attack);
+    expect(m.defense).toBe(BAT.defense);
+    expect(m.name).toBe('Bat');
+    expect(m.char).toBe('B');
   });
 
   test('returns distinct objects on each call', () => {
-    const a = createMonster(0, 0);
-    const b = createMonster(0, 0);
+    const a = createMonster(BAT, 0, 0);
+    const b = createMonster(BAT, 0, 0);
     expect(a).not.toBe(b);
     a.hp = 1;
-    expect(b.hp).toBe(2);
+    expect(b.hp).toBe(BAT.hp);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// monstersForLevel
+// ---------------------------------------------------------------------------
+
+describe('monstersForLevel', () => {
+  test('DL1 returns only level-1 monsters', () => {
+    const eligible = monstersForLevel(1);
+    expect(eligible.length).toBeGreaterThan(0);
+    for (const m of eligible) expect(m.level).toBe(1);
+  });
+
+  test('DL2 returns level 1-2 monsters', () => {
+    const eligible = monstersForLevel(2);
+    for (const m of eligible) expect(m.level).toBeGreaterThanOrEqual(1);
+    for (const m of eligible) expect(m.level).toBeLessThanOrEqual(2);
+    expect(eligible.some(m => m.level === 1)).toBe(true);
+    expect(eligible.some(m => m.level === 2)).toBe(true);
+  });
+
+  test('DL5 returns level 4-5 monsters', () => {
+    const eligible = monstersForLevel(5);
+    for (const m of eligible) expect(m.level).toBeGreaterThanOrEqual(4);
+    for (const m of eligible) expect(m.level).toBeLessThanOrEqual(5);
+  });
+
+  test('DL10 is clamped to level 4-5 (same as DL5)', () => {
+    expect(monstersForLevel(10)).toEqual(monstersForLevel(5));
+  });
+
+  test('all 26 monsters appear across all tiers', () => {
+    const seen = new Set();
+    for (let dl = 1; dl <= 5; dl++) {
+      for (const m of monstersForLevel(dl)) seen.add(m.name);
+    }
+    expect(seen.size).toBe(26);
   });
 });
 
@@ -131,12 +172,12 @@ describe('spawnMonsters', () => {
   beforeEach(() => { dungeon = generate({ seed: SEED }); });
 
   test('spawns rooms-1 monsters (one per non-start room)', () => {
-    const monsters = spawnMonsters(dungeon, () => Math.random());
+    const monsters = spawnMonsters(dungeon, () => Math.random(), 1);
     expect(monsters.length).toBe(dungeon.rooms.length - 1);
   });
 
   test('no monster is placed at the stairsUp position', () => {
-    const monsters = spawnMonsters(dungeon, () => Math.random());
+    const monsters = spawnMonsters(dungeon, () => Math.random(), 1);
     const atStart = monsters.some(
       m => m.x === dungeon.stairsUp.x && m.y === dungeon.stairsUp.y
     );
@@ -145,10 +186,24 @@ describe('spawnMonsters', () => {
 
   test('each monster is placed on a floor-like tile', () => {
     const walkable = new Set([TILE.FLOOR, TILE.CORRIDOR, TILE.DOOR, TILE.STAIRS_UP, TILE.STAIRS_DOWN]);
-    const monsters = spawnMonsters(dungeon, () => Math.random());
+    const monsters = spawnMonsters(dungeon, () => Math.random(), 1);
     for (const m of monsters) {
       expect(walkable.has(dungeon.map[m.y][m.x].type)).toBe(true);
     }
+  });
+
+  test('DL1 spawns only level-1 monsters', () => {
+    const rng = (() => { let i = 0; return () => [0, 0.5, 0.99][i++ % 3]; })();
+    const monsters = spawnMonsters(dungeon, rng, 1);
+    const level1Names = new Set(monstersForLevel(1).map(m => m.name));
+    for (const m of monsters) expect(level1Names.has(m.name)).toBe(true);
+  });
+
+  test('DL5 spawns only level 4-5 monsters', () => {
+    const rng = (() => { let i = 0; return () => [0, 0.5, 0.99][i++ % 3]; })();
+    const monsters = spawnMonsters(dungeon, rng, 5);
+    const level45Names = new Set(monstersForLevel(5).map(m => m.name));
+    for (const m of monsters) expect(level45Names.has(m.name)).toBe(true);
   });
 });
 
@@ -158,7 +213,6 @@ describe('spawnMonsters', () => {
 
 /**
  * Build a minimal state object for stepMonsters.
- * The dungeon is a generated level. Player and monsters are positioned manually.
  */
 function makeState(dungeon, player, monsters) {
   return { dungeon, player, monsters, messages: [] };
@@ -188,14 +242,12 @@ describe('stepMonsters — attack', () => {
 
   test('monster adjacent to player reduces player.hp', () => {
     const center = nonStartCenter(dungeon);
-    // Place player one step to the right of monster
     const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
-    const monster = createMonster(center.x, center.y);
+    const monster = createMonster(BAT, center.x, center.y);
     const state = makeState(dungeon, player, [monster]);
 
-    // Make the player cell walkable for this test
-    dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true };
-    dungeon.map[monster.y][monster.x] = { type: TILE.FLOOR, visible: true, visited: true };
+    dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    dungeon.map[monster.y][monster.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
 
     stepMonsters(state, () => 0.99); // guaranteed hit
     expect(player.hp).toBeLessThan(20);
@@ -204,11 +256,11 @@ describe('stepMonsters — attack', () => {
   test('attack damage is at least 1', () => {
     const center = nonStartCenter(dungeon);
     const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 100 };
-    const monster = createMonster(center.x, center.y);
+    const monster = createMonster(BAT, center.x, center.y);
     const state = makeState(dungeon, player, [monster]);
 
-    dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true };
-    dungeon.map[monster.y][monster.x] = { type: TILE.FLOOR, visible: true, visited: true };
+    dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    dungeon.map[monster.y][monster.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
 
     stepMonsters(state, () => 0.99); // guaranteed hit; min damage = 1 regardless of defense
     expect(player.hp).toBeLessThan(20);
@@ -225,16 +277,14 @@ describe('stepMonsters — move', () => {
 
   test('monster in range but not adjacent moves closer to player', () => {
     const center = nonStartCenter(dungeon);
-    // Place monster 3 steps left of center; player at center
     const mx = center.x - 3;
     const my = center.y;
     const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
-    const monster = createMonster(mx, my);
+    const monster = createMonster(BAT, mx, my);
     const state = makeState(dungeon, player, [monster]);
 
-    // Carve a clear floor path
     for (let x = mx; x <= center.x; x++) {
-      dungeon.map[my][x] = { type: TILE.FLOOR, visible: true, visited: true };
+      dungeon.map[my][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
     }
 
     const beforeDist = Math.abs(player.x - monster.x);
@@ -254,8 +304,7 @@ describe('stepMonsters — wait', () => {
 
   test('monster out of sight range does not move', () => {
     const center = nonStartCenter(dungeon);
-    // Monster very far from player (>8 Chebyshev)
-    const monster = createMonster(center.x, center.y);
+    const monster = createMonster(BAT, center.x, center.y);
     const player = { x: center.x + 20, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
     const state = makeState(dungeon, player, [monster]);
 
@@ -279,9 +328,9 @@ describe('dead monster cleanup', () => {
   test('dead monsters are removed from state.monsters after stepMonsters', () => {
     const center = nonStartCenter(dungeon);
     const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
-    const dead = createMonster(center.x + 5, center.y);
-    dead.hp = 0; // already dead
-    const alive = createMonster(center.x + 20, center.y); // out of range, won't act
+    const dead = createMonster(BAT, center.x + 5, center.y);
+    dead.hp = 0;
+    const alive = createMonster(BAT, center.x + 20, center.y); // out of range
     const state = makeState(dungeon, player, [dead, alive]);
 
     stepMonsters(state);
@@ -292,14 +341,12 @@ describe('dead monster cleanup', () => {
   test('monster killed by player attack is absent after step', () => {
     const center = nonStartCenter(dungeon);
     const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
-    // Rat with 1 hp; player attack=3, so resolveCombat kills it
-    const monster = createMonster(center.x + 1, center.y);
+    const monster = createMonster(BAT, center.x + 1, center.y);
     monster.hp = 1;
     const state = makeState(dungeon, player, [monster]);
 
-    dungeon.map[center.y][center.x + 1] = { type: TILE.FLOOR, visible: true, visited: true };
+    dungeon.map[center.y][center.x + 1] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
 
-    // Simulate what movePlayer does on bump-attack (guaranteed hit)
     resolveCombat(player, monster, () => 0.99);
     state.monsters = state.monsters.filter(m => m.hp > 0);
 

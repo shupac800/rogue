@@ -4,7 +4,7 @@
  */
 
 import { TILE } from '../dungeon/tiles.js';
-import { createMonster } from './monster.js';
+import { createMonster, monstersForLevel } from './monster.js';
 import { resolveCombat } from './combat.js';
 
 /** Chebyshev distance at which monsters become active. */
@@ -33,16 +33,20 @@ function roomCenter(room) {
 
 /**
  * Spawn one monster per room, skipping the player's starting room.
+ * Monster type is chosen randomly from those eligible for dungeonLevel.
  * @param {import('../dungeon/generator.js').Dungeon} dungeon
- * @param {() => number} rng - Unused for now; reserved for future variety.
+ * @param {() => number} rng
+ * @param {number} [dungeonLevel=1]
  * @returns {import('./monster.js').Monster[]}
  */
-export function spawnMonsters(dungeon, rng) {
+export function spawnMonsters(dungeon, rng, dungeonLevel = 1) {
   const monsters = [];
+  const eligible = monstersForLevel(dungeonLevel);
   for (const room of dungeon.rooms) {
     const center = roomCenter(room);
     if (center.x === dungeon.stairsUp.x && center.y === dungeon.stairsUp.y) continue;
-    monsters.push(createMonster(center.x, center.y));
+    const template = eligible[Math.floor(rng() * eligible.length)];
+    monsters.push(createMonster(template, center.x, center.y));
   }
   return monsters;
 }
