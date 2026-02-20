@@ -103,6 +103,21 @@ export function carveRoom(map, room) {
 }
 
 /**
+ * Return the first room whose interior contains the point (x, y), or null.
+ * Interior is defined as [room.x, room.x+width) × [room.y, room.y+height).
+ * @param {Room[]} rooms
+ * @param {number} x
+ * @param {number} y
+ * @returns {Room|null}
+ */
+export function findRoomContaining(rooms, x, y) {
+  return rooms.find(r =>
+    x >= r.x && x < r.x + r.width &&
+    y >= r.y && y < r.y + r.height
+  ) ?? null;
+}
+
+/**
  * Return the center coordinate of a room's interior.
  * @param {Room} room
  * @returns {{ x: number, y: number }}

@@ -36,9 +36,11 @@ export const TILE_CHAR = Object.freeze({
 
 /**
  * Create a fresh map cell with default visibility state.
+ * alwaysVisible: set true for permanently lit tiles (illuminated rooms);
+ * resetVisibility will leave these cells visible every turn.
  * @param {number} type - One of the TILE values.
- * @returns {{ type: number, visible: boolean, visited: boolean }}
+ * @returns {{ type: number, visible: boolean, visited: boolean, alwaysVisible: boolean }}
  */
 export function makeCell(type) {
-  return { type, visible: false, visited: false };
+  return { type, visible: false, visited: false, alwaysVisible: false };
 }

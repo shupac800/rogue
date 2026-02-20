@@ -7,6 +7,7 @@
 import { TILE } from '../dungeon/tiles.js';
 import { generate, createRng } from '../dungeon/generator.js';
 import { computeFov } from '../fov/index.js';
+import { findRoomContaining } from '../dungeon/room.js';
 import { createPlayer } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
@@ -45,6 +46,7 @@ export function isWalkable(type) {
  * @typedef {{
  *   dungeon: import('../dungeon/generator.js').Dungeon,
  *   player: import('./player.js').Player,
+ *   dungeonLevel: number,
  *   turn: number,
  *   monsters: import('./monster.js').Monster[],
  *   messages: string[]
@@ -65,9 +67,44 @@ export function createGame(options = {}) {
   const monsters = spawnMonsters(dungeon, monsterRng);
   const playerName = 'Fuckface';
   const welcomeMessage = 'Welcome to the Dungeons of Doom';
-  const state = { dungeon, player, turn: 0, monsters, messages: [welcomeMessage, `Good luck ${playerName}!`] };
+  const state = { dungeon, player, dungeonLevel: 1, turn: 0, monsters, messages: [welcomeMessage, `Good luck ${playerName}!`] };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
+  illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
   return state;
+}
+
+/**
+ * Permanently reveal all cells covering a room (interior + perimeter walls).
+ * Sets visible, visited, and alwaysVisible on each cell so they survive
+ * future resetVisibility calls.
+ * @param {Array<Array<{type:number,visible:boolean,visited:boolean,alwaysVisible:boolean}>>} map
+ * @param {import('../dungeon/room.js').Room} room
+ */
+function revealRoom(map, room) {
+  for (let dy = -1; dy <= room.height; dy++) {
+    for (let dx = -1; dx <= room.width; dx++) {
+      const cx = room.x + dx;
+      const cy = room.y + dy;
+      if (cy < 0 || cy >= map.length || cx < 0 || cx >= map[0].length) continue;
+      map[cy][cx].visible = true;
+      map[cy][cx].visited = true;
+      map[cy][cx].alwaysVisible = true;
+    }
+  }
+}
+
+/**
+ * If (x, y) lies inside an illuminated room, permanently reveal that room.
+ * No-op when the point is outside all rooms or the room is not illuminated.
+ * Call this whenever the player is placed inside a room.
+ * @param {Array<Array<{type:number,visible:boolean,visited:boolean,alwaysVisible:boolean}>>} map
+ * @param {import('../dungeon/room.js').Room[]} rooms
+ * @param {number} x
+ * @param {number} y
+ */
+export function illuminateRoomAt(map, rooms, x, y) {
+  const room = findRoomContaining(rooms, x, y);
+  if (room?.illuminated) revealRoom(map, room);
 }
 
 /**
@@ -80,7 +117,8 @@ export function createGame(options = {}) {
  * @returns {void}
  */
 export function movePlayer(state, dx, dy) {
-  const { dungeon: { map }, player, monsters } = state;
+  const { dungeon, player, monsters } = state;
+  const { map } = dungeon;
   const nx = player.x + dx;
   const ny = player.y + dy;
 
@@ -109,6 +147,9 @@ export function movePlayer(state, dx, dy) {
 
   player.x = nx;
   player.y = ny;
+  if (map[ny][nx].type === TILE.DOOR) {
+    illuminateRoomAt(map, dungeon.rooms, nx + dx, ny + dy);
+  }
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);

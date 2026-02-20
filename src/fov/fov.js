@@ -19,14 +19,14 @@ export function isBlocking(type) {
 }
 
 /**
- * Reset visible flag on every cell to false.
+ * Reset visible flag on every cell to false, unless alwaysVisible is set.
  * visited flags are left untouched (sticky by design).
- * @param {Array<Array<{type:number,visible:boolean,visited:boolean}>>} map
+ * @param {Array<Array<{type:number,visible:boolean,visited:boolean,alwaysVisible:boolean}>>} map
  */
 export function resetVisibility(map) {
   for (const row of map) {
     for (const cell of row) {
-      cell.visible = false;
+      if (!cell.alwaysVisible) cell.visible = false;
     }
   }
 }

@@ -1,5 +1,5 @@
 import { TILE, makeCell } from '../src/dungeon/tiles.js';
-import { buildSectors, generateRoom, carveRoom, roomCenter } from '../src/dungeon/room.js';
+import { buildSectors, generateRoom, carveRoom, roomCenter, findRoomContaining } from '../src/dungeon/room.js';
 import { createBlankMap } from '../src/dungeon/generator.js';
 
 const MAP_W = 80;
@@ -126,5 +126,32 @@ describe('roomCenter', () => {
   test('center of 1×1 room equals its origin', () => {
     const room = { x: 3, y: 3, width: 1, height: 1 };
     expect(roomCenter(room)).toEqual({ x: 3, y: 3 });
+  });
+});
+
+describe('findRoomContaining', () => {
+  const rooms = [
+    { x: 2, y: 2, width: 4, height: 3, illuminated: true },
+    { x: 10, y: 5, width: 3, height: 3, illuminated: false },
+  ];
+
+  test('returns the room when the point is inside its interior', () => {
+    expect(findRoomContaining(rooms, 3, 3)).toBe(rooms[0]);
+    expect(findRoomContaining(rooms, 11, 6)).toBe(rooms[1]);
+  });
+
+  test('returns null when the point is outside all rooms', () => {
+    expect(findRoomContaining(rooms, 0, 0)).toBeNull();
+    expect(findRoomContaining(rooms, 20, 20)).toBeNull();
+  });
+
+  test('returns null for a point on the room perimeter (wall tile, outside interior)', () => {
+    // x=1 is one tile to the left of room[0].x (the wall position)
+    expect(findRoomContaining(rooms, 1, 3)).toBeNull();
+    expect(findRoomContaining(rooms, 3, 1)).toBeNull();
+  });
+
+  test('returns null for an empty rooms array', () => {
+    expect(findRoomContaining([], 3, 3)).toBeNull();
   });
 });

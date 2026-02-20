@@ -7,9 +7,11 @@ import {
   createGame,
   movePlayer,
   isWalkable,
+  illuminateRoomAt,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
+import { findRoomContaining } from '../src/dungeon/room.js';
 
 // ---------------------------------------------------------------------------
 // createPlayer
@@ -110,6 +112,17 @@ describe('createGame', () => {
   test('SIGHT_RADIUS is a positive integer', () => {
     expect(Number.isInteger(SIGHT_RADIUS)).toBe(true);
     expect(SIGHT_RADIUS).toBeGreaterThan(0);
+  });
+
+  test('starting room is revealed when illuminated (DL1 → all rooms lit)', () => {
+    // DL1: all rooms illuminated; player starts in the stairsUp room
+    const { dungeon: { map, rooms }, player } = state;
+    const startRoom = findRoomContaining(rooms, player.x, player.y);
+    expect(startRoom).not.toBeNull();
+    expect(startRoom.illuminated).toBe(true);
+    const cx = startRoom.x + Math.floor(startRoom.width / 2);
+    const cy = startRoom.y + Math.floor(startRoom.height / 2);
+    expect(map[cy][cx].alwaysVisible).toBe(true);
   });
 });
 
@@ -251,6 +264,73 @@ describe('movePlayer — blocked', () => {
 // ---------------------------------------------------------------------------
 // movePlayer — wait (dx=0, dy=0)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// movePlayer — door illumination
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan the map for a DOOR tile that has a walkable non-door approach tile and
+ * a room interior tile on the far side. Returns the approach position, move
+ * direction, door position, and the room beyond, or null if none found.
+ * @param {object} state
+ * @returns {{ fromX:number, fromY:number, dx:number, dy:number, doorX:number, doorY:number, room:object }|null}
+ */
+function findIlluminatedDoorApproach(state) {
+  const { dungeon: { map, rooms } } = state;
+  const dirs = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
+  for (let y = 1; y < map.length - 1; y++) {
+    for (let x = 1; x < map[0].length - 1; x++) {
+      if (map[y][x].type !== TILE.DOOR) continue;
+      for (const { dx, dy } of dirs) {
+        const fromX = x - dx;
+        const fromY = y - dy;
+        const beyondX = x + dx;
+        const beyondY = y + dy;
+        if (!isWalkable(map[fromY][fromX].type)) continue;
+        if (map[fromY][fromX].type === TILE.DOOR) continue;
+        const room = findRoomContaining(rooms, beyondX, beyondY);
+        if (room?.illuminated) return { fromX, fromY, dx, dy, doorX: x, doorY: y, room };
+      }
+    }
+  }
+  return null;
+}
+
+describe('movePlayer — door illumination', () => {
+  // DL1 → all rooms illuminated
+  let state;
+  beforeEach(() => {
+    state = createGame({ seed: 42 });
+    state.monsters = []; // avoid accidental combat
+  });
+
+  test('stepping onto a door of an illuminated room reveals the room interior', () => {
+    const approach = findIlluminatedDoorApproach(state);
+    expect(approach).not.toBeNull();
+    const { fromX, fromY, dx, dy, room } = approach;
+    state.player.x = fromX;
+    state.player.y = fromY;
+    movePlayer(state, dx, dy);
+    const cx = room.x + Math.floor(room.width / 2);
+    const cy = room.y + Math.floor(room.height / 2);
+    expect(state.dungeon.map[cy][cx].alwaysVisible).toBe(true);
+    expect(state.dungeon.map[cy][cx].visited).toBe(true);
+  });
+
+  test('illuminated room cells remain visible after subsequent turns', () => {
+    const approach = findIlluminatedDoorApproach(state);
+    const { fromX, fromY, dx, dy, room } = approach;
+    state.player.x = fromX;
+    state.player.y = fromY;
+    movePlayer(state, dx, dy);
+    // Take a second turn (wait) to trigger another resetVisibility
+    movePlayer(state, 0, 0);
+    const cx = room.x + Math.floor(room.width / 2);
+    const cy = room.y + Math.floor(room.height / 2);
+    expect(state.dungeon.map[cy][cx].visible).toBe(true);
+  });
+});
 
 describe('movePlayer — wait', () => {
   let state;

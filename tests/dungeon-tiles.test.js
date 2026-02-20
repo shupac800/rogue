@@ -38,7 +38,7 @@ describe('TILE_CHAR map', () => {
 describe('makeCell', () => {
   test('returns object with correct shape', () => {
     const cell = makeCell(TILE.FLOOR);
-    expect(cell).toEqual({ type: TILE.FLOOR, visible: false, visited: false });
+    expect(cell).toEqual({ type: TILE.FLOOR, visible: false, visited: false, alwaysVisible: false });
   });
 
   test('each call returns a new object', () => {
