@@ -14,6 +14,14 @@ import { resolveCombat } from './combat.js';
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 8;
 
+/** Player-attack message for each hit tier (0 = glancing, 3 = devastating). */
+const PLAYER_HIT_MSGS = [
+  name => `You hit the ${name}`,
+  name => `You have injured the ${name}`,
+  name => `You scored an excellent hit on the ${name}`,
+  name => `You clobbered the ${name}`,
+];
+
 /** Tile types the player can walk onto. */
 const WALKABLE = new Set([
   TILE.FLOOR,
@@ -55,7 +63,9 @@ export function createGame(options = {}) {
   const player = createPlayer(dungeon.stairsUp.x, dungeon.stairsUp.y);
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng);
-  const state = { dungeon, player, turn: 0, monsters, messages: ['Welcome to the Dungeons of Doom'] };
+  const playerName = 'Fuckface';
+  const welcomeMessage = 'Welcome to the Dungeons of Doom';
+  const state = { dungeon, player, turn: 0, monsters, messages: [welcomeMessage, `Good luck ${playerName}!`] };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   return state;
 }
@@ -82,10 +92,14 @@ export function movePlayer(state, dx, dy) {
 
   const target = monsters.find(m => m.hp > 0 && m.x === nx && m.y === ny);
   if (target) {
-    resolveCombat(player, target);
+    const { hit, tier } = resolveCombat(player, target);
+    if (!hit) {
+      state.messages.push(`You miss the ${target.name}`);
+    } else {
+      state.messages.push(PLAYER_HIT_MSGS[tier](target.name));
+      if (target.hp <= 0) state.messages.push(`You have defeated the ${target.name}`);
+    }
     state.monsters = monsters.filter(m => m.hp > 0);
-    state.messages.push(`You hit the ${target.name}`);
-    if (target.hp <= 0) state.messages.push(`You have defeated the ${target.name}`);
     state.turn += 1;
     computeFov(map, player, SIGHT_RADIUS);
     stepMonsters(state);

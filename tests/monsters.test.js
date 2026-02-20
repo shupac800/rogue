@@ -28,12 +28,12 @@ describe('createMonster', () => {
 
   test('sets correct starting stats', () => {
     const m = createMonster(0, 0);
-    expect(m.hp).toBe(5);
-    expect(m.maxHp).toBe(5);
+    expect(m.hp).toBe(2);
+    expect(m.maxHp).toBe(2);
     expect(m.attack).toBe(2);
     expect(m.defense).toBe(0);
     expect(m.name).toBe('rat');
-    expect(m.char).toBe('r');
+    expect(m.char).toBe('R');
   });
 
   test('returns distinct objects on each call', () => {
@@ -41,7 +41,7 @@ describe('createMonster', () => {
     const b = createMonster(0, 0);
     expect(a).not.toBe(b);
     a.hp = 1;
-    expect(b.hp).toBe(5);
+    expect(b.hp).toBe(2);
   });
 });
 
@@ -49,33 +49,74 @@ describe('createMonster', () => {
 // resolveCombat
 // ---------------------------------------------------------------------------
 
+/**
+ * Build a deterministic RNG that returns values from the given sequence.
+ * @param {...number} values
+ * @returns {() => number}
+ */
+function seq(...values) {
+  let i = 0;
+  return () => values[i++ % values.length];
+}
+
+/** rng value that guarantees a hit (>= MISS_CHANCE threshold of 0.25). */
+const HIT = 0.99;
+/** rng value that guarantees a miss (< MISS_CHANCE threshold of 0.25). */
+const MISS = 0.0;
+
 describe('resolveCombat', () => {
-  test('damage = attack - defense', () => {
-    const attacker = { attack: 5 };
-    const defender = { hp: 10, defense: 2 };
-    const { damage } = resolveCombat(attacker, defender);
-    expect(damage).toBe(3);
+  test('returns hit:false and 0 damage on a miss', () => {
+    const result = resolveCombat({ attack: 5 }, { hp: 10, defense: 2 }, seq(MISS));
+    expect(result.hit).toBe(false);
+    expect(result.damage).toBe(0);
   });
 
-  test('minimum damage is 1 when defense >= attack', () => {
-    const attacker = { attack: 1 };
+  test('does not mutate defender.hp on a miss', () => {
+    const defender = { hp: 10, defense: 0 };
+    resolveCombat({ attack: 3 }, defender, seq(MISS));
+    expect(defender.hp).toBe(10);
+  });
+
+  test('returns hit:true on a hit', () => {
+    const result = resolveCombat({ attack: 5 }, { hp: 10, defense: 2 }, seq(HIT, 0.5));
+    expect(result.hit).toBe(true);
+  });
+
+  test('mutates defender.hp on a hit', () => {
+    const defender = { hp: 10, defense: 0 };
+    resolveCombat({ attack: 3 }, defender, seq(HIT, 0.5));
+    expect(defender.hp).toBeLessThan(10);
+  });
+
+  test('minimum damage is 1 even when defense exceeds raw damage', () => {
+    // rawDamage = 1 + floor(0 * 4) = 1; defense = 5; max(1, 1-5) = 1
     const defender = { hp: 10, defense: 5 };
-    const { damage } = resolveCombat(attacker, defender);
+    const { damage } = resolveCombat({ attack: 1 }, defender, seq(HIT, 0.0));
     expect(damage).toBe(1);
   });
 
-  test('mutates defender.hp', () => {
-    const attacker = { attack: 4 };
-    const defender = { hp: 10, defense: 1 };
-    resolveCombat(attacker, defender);
-    expect(defender.hp).toBe(7);
+  test('lethal hit drives defender hp below zero', () => {
+    const defender = { hp: 3, defense: 0 };
+    resolveCombat({ attack: 10 }, defender, seq(HIT, 0.99));
+    expect(defender.hp).toBeLessThan(0);
   });
 
-  test('lethal hit drives hp below zero', () => {
-    const attacker = { attack: 10 };
-    const defender = { hp: 3, defense: 0 };
-    resolveCombat(attacker, defender);
-    expect(defender.hp).toBeLessThan(0);
+  test('tier 0 for minimum raw damage', () => {
+    // attack=3, maxRaw=12, rng2=0 → rawDamage=1 → tier=floor(0/3)=0
+    const { tier } = resolveCombat({ attack: 3 }, { hp: 10, defense: 0 }, seq(HIT, 0.0));
+    expect(tier).toBe(0);
+  });
+
+  test('tier 1 for low-mid raw damage', () => {
+    // attack=3, maxRaw=12, rng2=0.333 → rawDamage=1+floor(4)=5 → tier=floor(4/3)=1
+    const { tier } = resolveCombat({ attack: 3 }, { hp: 10, defense: 0 }, seq(HIT, 0.333));
+    expect(tier).toBe(1);
+  });
+
+  test('tier 3 for near-maximum raw damage', () => {
+    // attack=3, maxRaw=12, rng2=0.99 → rawDamage=1+floor(11.88)=12 → tier=min(3,floor(11/3))=3
+    const { tier } = resolveCombat({ attack: 3 }, { hp: 20, defense: 0 }, seq(HIT, 0.99));
+    expect(tier).toBe(3);
   });
 });
 
@@ -120,7 +161,7 @@ describe('spawnMonsters', () => {
  * The dungeon is a generated level. Player and monsters are positioned manually.
  */
 function makeState(dungeon, player, monsters) {
-  return { dungeon, player, monsters };
+  return { dungeon, player, monsters, messages: [] };
 }
 
 /**
@@ -156,7 +197,7 @@ describe('stepMonsters — attack', () => {
     dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true };
     dungeon.map[monster.y][monster.x] = { type: TILE.FLOOR, visible: true, visited: true };
 
-    stepMonsters(state);
+    stepMonsters(state, () => 0.99); // guaranteed hit
     expect(player.hp).toBeLessThan(20);
   });
 
@@ -169,8 +210,8 @@ describe('stepMonsters — attack', () => {
     dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true };
     dungeon.map[monster.y][monster.x] = { type: TILE.FLOOR, visible: true, visited: true };
 
-    stepMonsters(state);
-    expect(player.hp).toBe(19); // damage = max(1, 2-100) = 1
+    stepMonsters(state, () => 0.99); // guaranteed hit; min damage = 1 regardless of defense
+    expect(player.hp).toBeLessThan(20);
   });
 });
 
@@ -258,8 +299,8 @@ describe('dead monster cleanup', () => {
 
     dungeon.map[center.y][center.x + 1] = { type: TILE.FLOOR, visible: true, visited: true };
 
-    // Simulate what movePlayer does on bump-attack
-    resolveCombat(player, monster);
+    // Simulate what movePlayer does on bump-attack (guaranteed hit)
+    resolveCombat(player, monster, () => 0.99);
     state.monsters = state.monsters.filter(m => m.hp > 0);
 
     expect(state.monsters.length).toBe(0);

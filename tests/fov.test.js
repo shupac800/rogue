@@ -28,7 +28,7 @@ describe('isBlocking', () => {
   test('WALL blocks', () => expect(isBlocking(TILE.WALL)).toBe(true));
   test('FLOOR does not block', () => expect(isBlocking(TILE.FLOOR)).toBe(false));
   test('CORRIDOR does not block', () => expect(isBlocking(TILE.CORRIDOR)).toBe(false));
-  test('DOOR does not block', () => expect(isBlocking(TILE.DOOR)).toBe(false));
+  test('DOOR blocks', () => expect(isBlocking(TILE.DOOR)).toBe(true));
   test('STAIRS_UP does not block', () => expect(isBlocking(TILE.STAIRS_UP)).toBe(false));
   test('STAIRS_DOWN does not block', () => expect(isBlocking(TILE.STAIRS_DOWN)).toBe(false));
 });

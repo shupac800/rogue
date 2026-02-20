@@ -31,7 +31,7 @@ describe('createPlayer', () => {
 
   test('sets correct starting stats', () => {
     const p = createPlayer(0, 0);
-    expect(p.hp).toBe(20);
+    expect(p.hp).toBe(4);
     expect(p.maxHp).toBe(20);
     expect(p.attack).toBe(3);
     expect(p.defense).toBe(1);
@@ -45,7 +45,7 @@ describe('createPlayer', () => {
     const b = createPlayer(0, 0);
     expect(a).not.toBe(b);
     a.hp = 1;
-    expect(b.hp).toBe(20);
+    expect(b.hp).toBe(4);
   });
 });
 

@@ -54,9 +54,10 @@ export function spawnMonsters(dungeon, rng) {
  * @param {{ dungeon: import('../dungeon/generator.js').Dungeon,
  *            player: import('./player.js').Player,
  *            monsters: import('./monster.js').Monster[] }} state
+ * @param {() => number} [rng=Math.random]
  * @returns {void}
  */
-export function stepMonsters(state) {
+export function stepMonsters(state, rng = Math.random) {
   const { dungeon: { map }, player, monsters } = state;
 
   for (const m of monsters) {
@@ -75,8 +76,9 @@ export function stepMonsters(state) {
       const ty = m.y + sdy;
 
       if (tx === player.x && ty === player.y) {
-        resolveCombat(m, player);
-        (state.messages ??= []).push(`The ${m.name} hits you`);
+        const result = resolveCombat(m, player, rng);
+        const msg = result.hit ? `The ${m.name} hits you` : `The ${m.name} misses`;
+        (state.messages ??= []).push(msg);
         break;
       }
 
