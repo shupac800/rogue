@@ -30,12 +30,17 @@ function formatStats(player) {
 
 /**
  * Render the status bar into the given blessed box.
+ * When reversed is true, the message area is shown in inverse video to
+ * signal that more messages are pending (press space to advance).
  * @param {import('blessed').Widgets.BoxElement} box
  * @param {import('../game/state.js').GameState} state
+ * @param {string} [message=''] - The message to display in the left area.
+ * @param {boolean} [reversed=false] - Render the message area in inverse video.
  */
-export function renderStatus(box, state) {
+export function renderStatus(box, state, message = '', reversed = false) {
   const stats = formatStats(state.player);
   const msgWidth = 80 - STATS_WIDTH;
-  const msg = (state.message ?? '').slice(0, msgWidth).padEnd(msgWidth);
-  box.setContent(msg + stats);
+  const msgText = message.slice(0, msgWidth).padEnd(msgWidth);
+  const msgContent = reversed ? `{inverse}${msgText}{/inverse}` : msgText;
+  box.setContent(msgContent + stats);
 }

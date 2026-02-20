@@ -39,7 +39,7 @@ export function isWalkable(type) {
  *   player: import('./player.js').Player,
  *   turn: number,
  *   monsters: import('./monster.js').Monster[],
- *   message: string
+ *   messages: string[]
  * }} GameState
  */
 
@@ -55,7 +55,7 @@ export function createGame(options = {}) {
   const player = createPlayer(dungeon.stairsUp.x, dungeon.stairsUp.y);
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng);
-  const state = { dungeon, player, turn: 0, monsters, message: 'Welcome to the Dungeons of Doom' };
+  const state = { dungeon, player, turn: 0, monsters, messages: ['Welcome to the Dungeons of Doom'] };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   return state;
 }
@@ -78,23 +78,24 @@ export function movePlayer(state, dx, dy) {
   if (nx < 0 || nx >= map[0].length) return;
   if (!isWalkable(map[ny][nx].type)) return;
 
+  state.messages = [];
+
   const target = monsters.find(m => m.hp > 0 && m.x === nx && m.y === ny);
   if (target) {
     resolveCombat(player, target);
     state.monsters = monsters.filter(m => m.hp > 0);
-    state.message = target.hp <= 0 ? `You have defeated the ${target.name}` : `You hit the ${target.name}`;
+    state.messages.push(target.hp <= 0 ? `You have defeated the ${target.name}` : `You hit the ${target.name}`);
     state.turn += 1;
     computeFov(map, player, SIGHT_RADIUS);
     stepMonsters(state);
-    if (player.hp <= 0) state.message = 'You died';
+    if (player.hp <= 0) state.messages.push('You died');
     return;
   }
 
   player.x = nx;
   player.y = ny;
-  state.message = '';
   state.turn += 1;
   computeFov(map, player, SIGHT_RADIUS);
   stepMonsters(state);
-  if (player.hp <= 0) state.message = 'You died';
+  if (player.hp <= 0) state.messages.push('You died');
 }

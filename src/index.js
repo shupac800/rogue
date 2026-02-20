@@ -24,22 +24,59 @@ screen.append(statusBox);
 
 const state = createGame();
 
-/** Re-render all widgets and flush to the terminal. */
-function render() {
+/**
+ * Messages from the current turn that have not yet been shown.
+ * Non-empty means input is blocked until the player presses space.
+ * @type {string[]}
+ */
+let moreQueue = [];
+
+/**
+ * Render map and status bar with an explicit message and style.
+ * @param {string} message
+ * @param {boolean} reversed - True while more messages are pending.
+ */
+function render(message, reversed) {
   renderMap(screen, state.dungeon, state.player, state.monsters);
-  renderStatus(statusBox, state);
+  renderStatus(statusBox, state, message, reversed);
   screen.render();
 }
 
+/**
+ * Called after every completed player turn.
+ * Loads state.messages into moreQueue and shows the first one.
+ * If only one message, it is shown in normal text immediately.
+ */
+function afterTurn() {
+  const msgs = state.messages;
+  if (msgs.length <= 1) {
+    moreQueue = [];
+    render(msgs[0] ?? '', false);
+  } else {
+    moreQueue = msgs.slice(1);
+    render(msgs[0], true);
+  }
+}
+
 screen.on('keypress', (_ch, key) => {
-  const delta = getMoveDelta(key?.name ?? _ch);
+  const keyName = key?.name ?? _ch;
+
+  if (moreQueue.length > 0) {
+    if (keyName === 'space') {
+      const next = moreQueue.shift();
+      render(next, moreQueue.length > 0);
+    }
+    return;
+  }
+
+  const delta = getMoveDelta(keyName);
   if (delta) {
     movePlayer(state, delta.dx, delta.dy);
-    render();
+    afterTurn();
   }
 });
 
-render();
+afterTurn();
 
 process.on('SIGINT', () => {
   screen.destroy();
