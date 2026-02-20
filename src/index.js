@@ -6,7 +6,7 @@
 
 import blessed from 'blessed';
 import { createScreen } from './render/screen.js';
-import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, descendStairs, ascendStairs } from './game/index.js';
+import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, descendStairs, ascendStairs, cheatRankUp } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
@@ -99,7 +99,7 @@ function afterTurn() {
 function transitionToTombstone() {
   screenState = 'terminal';
   terminalBox.show();
-  renderTombstone(terminalBox, state.playerName, state.causeOfDeath ?? 'unknown', state.dungeonLevel, state.player.gold);
+  renderTombstone(terminalBox, state.playerName, state.player.rank, state.causeOfDeath ?? 'unknown', state.dungeonLevel, state.player.gold);
   screen.render();
 }
 
@@ -244,6 +244,12 @@ screen.on('keypress', (_ch, key) => {
 
   if (state.dead) {
     transitionToTombstone();
+    return;
+  }
+
+  if (_ch === '+') {
+    cheatRankUp(state);
+    afterTurn();
     return;
   }
 

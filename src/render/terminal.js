@@ -24,17 +24,19 @@ export function renderTerminal(box, outputLines, prompt, inputBuffer) {
  * Box width is determined by the widest content line.
  * @param {import('blessed').Widgets.BoxElement} box
  * @param {string} playerName
+ * @param {string} rank
  * @param {string} causeOfDeath
  * @param {number} dungeonLevel
  * @param {number} gold
  */
-export function renderTombstone(box, playerName, causeOfDeath, dungeonLevel, gold) {
+export function renderTombstone(box, playerName, rank, causeOfDeath, dungeonLevel, gold) {
   const COLS = 80;
   const ROWS = 24;
   const contentLines = [
     'R.I.P.',
     '',
     playerName,
+    rank,
     '',
     `killed by ${causeOfDeath}`,
     `on level ${dungeonLevel}`,

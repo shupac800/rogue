@@ -458,6 +458,18 @@ function promotePlayer(player, prevLevel, newLevel) {
 }
 
 /**
+ * Cheat: immediately promote the player one rank (no-op at max rank).
+ * @param {GameState} state
+ */
+export function cheatRankUp(state) {
+  const newLevel = Math.min(RANKS.length - 1, state.player.xpLevel + 1);
+  if (newLevel > state.player.xpLevel) {
+    promotePlayer(state.player, state.player.xpLevel, newLevel);
+    state.messages = [`[CHEAT] You have earned the rank of ${state.player.rank}`];
+  }
+}
+
+/**
  * Restore 1 HP if the player is alive, below max HP, and the turn count is
  * a multiple of the rank-appropriate regen rate. No-op otherwise.
  * @param {GameState} state

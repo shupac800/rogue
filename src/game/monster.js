@@ -68,5 +68,5 @@ export function monstersForLevel(dungeonLevel) {
  */
 export function createMonster(template, x, y) {
   const { name, char, hp, attack, defense, xp } = template;
-  return { x, y, hp, maxHp: hp, attack, defense, xp, name, char };
+  return { x, y, hp, maxHp: hp, attack, defense, xp, name: name.toLowerCase(), char };
 }

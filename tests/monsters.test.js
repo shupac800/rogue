@@ -35,7 +35,7 @@ describe('createMonster', () => {
     expect(m.maxHp).toBe(BAT.hp);
     expect(m.attack).toBe(BAT.attack);
     expect(m.defense).toBe(BAT.defense);
-    expect(m.name).toBe('Bat');
+    expect(m.name).toBe('bat');
     expect(m.char).toBe('B');
   });
 
@@ -195,14 +195,14 @@ describe('spawnMonsters', () => {
   test('DL1 spawns only level-1 monsters', () => {
     const rng = (() => { let i = 0; return () => [0, 0.5, 0.99][i++ % 3]; })();
     const monsters = spawnMonsters(dungeon, rng, 1);
-    const level1Names = new Set(monstersForLevel(1).map(m => m.name));
+    const level1Names = new Set(monstersForLevel(1).map(m => m.name.toLowerCase()));
     for (const m of monsters) expect(level1Names.has(m.name)).toBe(true);
   });
 
   test('DL5 spawns only level 4-5 monsters', () => {
     const rng = (() => { let i = 0; return () => [0, 0.5, 0.99][i++ % 3]; })();
     const monsters = spawnMonsters(dungeon, rng, 5);
-    const level45Names = new Set(monstersForLevel(5).map(m => m.name));
+    const level45Names = new Set(monstersForLevel(5).map(m => m.name.toLowerCase()));
     for (const m of monsters) expect(level45Names.has(m.name)).toBe(true);
   });
 });
