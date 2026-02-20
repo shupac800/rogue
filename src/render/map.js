@@ -18,12 +18,13 @@ import { TILE_CHAR, TILE } from '../dungeon/tiles.js';
  * @type {Object.<string,number>}
  */
 const ATTR = {
-  WALL:   (7 << 9) | 0,              // white fg (7), black bg (0)
-  FLOOR:  (7 << 9) | 0,              // white fg (7), black bg (0)
-  DOOR:   (3 << 9) | 0,              // yellow fg (3), black bg (0)
-  STAIRS: (3 << 9) | 0,              // yellow fg (3), black bg (0)
-  PLAYER: (1 << 18) | (3 << 9) | 0,  // bold + yellow fg (3), black bg
-  HIDDEN: (0x1ff << 9) | 0,           // terminal default fg, black bg
+  WALL:    (7 << 9) | 0,              // white fg (7), black bg (0)
+  FLOOR:   (7 << 9) | 0,              // white fg (7), black bg (0)
+  DOOR:    (3 << 9) | 0,              // yellow fg (3), black bg (0)
+  STAIRS:  (3 << 9) | 0,              // yellow fg (3), black bg (0)
+  PLAYER:  (1 << 18) | (3 << 9) | 0,  // bold + yellow fg (3), black bg
+  HIDDEN:  (0x1ff << 9) | 0,           // terminal default fg, black bg
+  MONSTER: (1 << 9) | 0,              // red fg (1), black bg
 };
 
 /** Box-drawing character lookup: key is 'UDLR' (1=WALL neighbor, 0=other). */
@@ -124,15 +125,29 @@ function cellInfo(map, x, y, isPlayer) {
  * @param {import('blessed').Widgets.Screen} screen
  * @param {import('../dungeon/generator.js').Dungeon} dungeon
  * @param {{x:number,y:number}} player
+ * @param {import('../game/monster.js').Monster[]} monsters
  */
-export function renderMap(screen, dungeon, player) {
+export function renderMap(screen, dungeon, player, monsters) {
   const { map, width, height } = dungeon;
+
+  const monsterMap = new Map();
+  for (const m of monsters) {
+    if (m.hp > 0) monsterMap.set(`${m.x},${m.y}`, m.char);
+  }
+
   for (let y = 0; y < height; y++) {
     if (!screen.lines[y]) continue;
     for (let x = 0; x < width; x++) {
       if (screen.lines[y][x] === undefined) continue;
-      const { ch, attr } = cellInfo(map, x, y, x === player.x && y === player.y);
-      screen.lines[y][x] = [attr, ch];
+      const cell = map[y][x];
+      const isPlayer = x === player.x && y === player.y;
+      const monsterChar = !isPlayer && cell.visible ? monsterMap.get(`${x},${y}`) : undefined;
+      if (monsterChar !== undefined) {
+        screen.lines[y][x] = [ATTR.MONSTER, monsterChar];
+      } else {
+        const { ch, attr } = cellInfo(map, x, y, isPlayer);
+        screen.lines[y][x] = [attr, ch];
+      }
     }
     screen.lines[y].dirty = true;
   }

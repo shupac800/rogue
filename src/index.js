@@ -26,7 +26,7 @@ const state = createGame();
 
 /** Re-render all widgets and flush to the terminal. */
 function render() {
-  renderMap(screen, state.dungeon, state.player);
+  renderMap(screen, state.dungeon, state.player, state.monsters);
   renderStatus(statusBox, state);
   screen.render();
 }
