@@ -8,7 +8,7 @@ import { TILE } from '../dungeon/tiles.js';
 import { generate, createRng } from '../dungeon/generator.js';
 import { computeFov } from '../fov/index.js';
 import { findRoomContaining } from '../dungeon/room.js';
-import { createPlayer } from './player.js';
+import { createPlayer, xpToLevel, RANKS } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 
@@ -64,12 +64,14 @@ export function isWalkable(type) {
 /**
  * Place gold items in rooms. Each room has a 20% chance of containing one
  * pile. Amount scales with dungeonLevel: 2 to min(80, dungeonLevel * 16).
+ * Never places gold at the player's starting position (stairsUp).
  * @param {import('../dungeon/room.js').Room[]} rooms
  * @param {() => number} rng
  * @param {number} dungeonLevel
+ * @param {{ x: number, y: number }} stairsUp
  * @returns {GoldItem[]}
  */
-function placeGoldItems(rooms, rng, dungeonLevel) {
+function placeGoldItems(rooms, rng, dungeonLevel, stairsUp) {
   const items = [];
   for (const room of rooms) {
     // TODO: restore 20% chance: if (rng() >= 0.2) continue;
@@ -77,6 +79,7 @@ function placeGoldItems(rooms, rng, dungeonLevel) {
     const y = room.y + Math.floor(rng() * room.height);
     const maxAmount = Math.min(80, dungeonLevel * 16);
     const amount = 2 + Math.floor((rng() + rng() + rng()) / 3 * (maxAmount - 1));
+    if (x === stairsUp.x && y === stairsUp.y) continue;
     items.push({ x, y, amount });
   }
   return items;
@@ -111,7 +114,7 @@ export function createGame(options = {}) {
   const player = createPlayer(dungeon.stairsUp.x, dungeon.stairsUp.y);
   const monsterRng = createRng(options.seed !== undefined ? options.seed ^ 0xdeadbeef : undefined);
   const monsters = spawnMonsters(dungeon, monsterRng, dungeonLevel);
-  const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel);
+  const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel, dungeon.stairsUp);
   const playerName = options.playerName ?? 'Adventurer';
   const welcomeMessage = 'Welcome to the Dungeons of Doom';
   const state = { dungeon, player, playerName, dungeonLevel, turn: 0, monsters, goldItems, messages: [welcomeMessage, `Good luck ${playerName}!`], dead: false, causeOfDeath: null };
@@ -193,7 +196,12 @@ export function movePlayer(state, dx, dy) {
       state.messages.push(`You miss the ${target.name}`);
     } else {
       state.messages.push(PLAYER_HIT_MSGS[tier](target.name));
-      if (target.hp <= 0) state.messages.push(`You have defeated the ${target.name}`);
+      if (target.hp <= 0) {
+        player.xp += target.xp;
+        player.xpLevel = xpToLevel(player.xp);
+        player.rank = RANKS[player.xpLevel];
+        state.messages.push(`You have defeated the ${target.name}`);
+      }
     }
     state.monsters = monsters.filter(m => m.hp > 0);
     state.turn += 1;
