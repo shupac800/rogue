@@ -283,6 +283,7 @@ export function dropItem(state, item) {
   const tileOccupied =
     tileType === TILE.STAIRS_UP ||
     tileType === TILE.STAIRS_DOWN ||
+    tileType === TILE.DOOR ||
     state.dungeonItems.some(d => d.x === x && d.y === y) ||
     state.goldItems.some(g => g.x === x && g.y === y);
   if (tileOccupied) {

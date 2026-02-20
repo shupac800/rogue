@@ -468,6 +468,20 @@ describe('dropItem', () => {
     dropItem(state, armor);
     expect(state.player.inventory.length).toBe(before - 1);
   });
+
+  test('cannot drop on a door tile', () => {
+    const { map } = state.dungeon;
+    outer: for (let y = 0; y < map.length; y++) {
+      for (let x = 0; x < map[0].length; x++) {
+        if (map[y][x].type === TILE.DOOR) { state.player.x = x; state.player.y = y; break outer; }
+      }
+    }
+    const food = state.player.inventory.find(i => i.type === 'food');
+    const before = state.player.inventory.length;
+    dropItem(state, food);
+    expect(state.player.inventory.length).toBe(before);
+    expect(state.messages[0]).toMatch(/can't drop that here/i);
+  });
 });
 
 // ---------------------------------------------------------------------------
