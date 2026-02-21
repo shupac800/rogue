@@ -6,12 +6,13 @@
 
 import blessed from 'blessed';
 import { createScreen } from './render/screen.js';
-import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp } from './game/index.js';
+import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
 import { renderInventory } from './render/inventory.js';
 import { renderArmorSelect } from './render/armor-select.js';
+import { renderRingSelect } from './render/ring-select.js';
 import { getMoveDelta } from './input/keys.js';
 
 const screen = createScreen();
@@ -45,6 +46,11 @@ let inventoryIdx = 0;
 let currentArmorItems = [];
 /** Cursor position within currentArmorItems. */
 let armorSelectIdx = 0;
+
+/** Ring items visible in the ring management screen (subset of player inventory). */
+let currentRingItems = [];
+/** Cursor position within currentRingItems. */
+let ringSelectIdx = 0;
 
 /** Accumulated keystrokes in terminal state. */
 let terminalInput = '';
@@ -191,8 +197,20 @@ screen.on('keypress', (_ch, key) => {
       terminalBox.hide();
       afterTurn();
       return;
+    } else if (_ch === 'p' && item?.type === 'ring') {
+      const slot = state.player.equippedRings.indexOf(item);
+      if (slot !== -1) {
+        removeRing(state, slot);
+      } else {
+        const free = state.player.equippedRings.indexOf(null);
+        if (free !== -1) putOnRing(state, item, free);
+      }
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
     }
-    renderInventory(terminalBox, inv, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx);
+    renderInventory(terminalBox, inv, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings);
     screen.render();
     return;
   }
@@ -242,6 +260,61 @@ screen.on('keypress', (_ch, key) => {
     return;
   }
 
+  if (screenState === 'ring') {
+    if (keyName === 'escape') {
+      screenState = 'game';
+      terminalBox.hide();
+      renderGame('', false);
+      return;
+    }
+    const selected = currentRingItems[ringSelectIdx];
+    if (keyName === 'up' || keyName === 'k') {
+      ringSelectIdx = Math.max(0, ringSelectIdx - 1);
+    } else if (keyName === 'down' || keyName === 'j') {
+      ringSelectIdx = Math.min(currentRingItems.length - 1, ringSelectIdx + 1);
+    } else if (keyName === 'return' || keyName === 'enter') {
+      if (selected) {
+        const slot = state.player.equippedRings.indexOf(selected);
+        if (slot !== -1) {
+          removeRing(state, slot);
+          screenState = 'game';
+          terminalBox.hide();
+          afterTurn();
+          return;
+        }
+        const free = state.player.equippedRings.indexOf(null);
+        if (free !== -1) {
+          putOnRing(state, selected, free);
+          screenState = 'game';
+          terminalBox.hide();
+          afterTurn();
+          return;
+        }
+      }
+    } else if (_ch === 'l' && selected && !state.player.equippedRings[0]) {
+      putOnRing(state, selected, 0);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
+    } else if (_ch === 'r' && selected && !state.player.equippedRings[1]) {
+      putOnRing(state, selected, 1);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
+    } else if (_ch === 'd' && selected && !state.player.equippedRings.includes(selected)) {
+      dropItem(state, selected);
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+      return;
+    }
+    renderRingSelect(terminalBox, currentRingItems, state.player.equippedRings, ringSelectIdx);
+    screen.render();
+    return;
+  }
+
   if (moreQueue.length > 0) {
     const next = moreQueue.shift();
     renderGame(next, moreQueue.length > 0);
@@ -275,7 +348,7 @@ screen.on('keypress', (_ch, key) => {
     inventoryIdx = 0;
     screenState = 'inventory';
     terminalBox.show();
-    renderInventory(terminalBox, state.player.inventory, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx);
+    renderInventory(terminalBox, state.player.inventory, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings);
     screen.render();
     return;
   }
@@ -287,6 +360,16 @@ screen.on('keypress', (_ch, key) => {
     screenState = 'armor';
     terminalBox.show();
     renderArmorSelect(terminalBox, currentArmorItems, state.player.equippedArmor, armorSelectIdx);
+    screen.render();
+    return;
+  }
+
+  if (_ch === 'P') {
+    currentRingItems = state.player.inventory.filter(item => item.type === 'ring');
+    ringSelectIdx = 0;
+    screenState = 'ring';
+    terminalBox.show();
+    renderRingSelect(terminalBox, currentRingItems, state.player.equippedRings, ringSelectIdx);
     screen.render();
     return;
   }

@@ -26,9 +26,10 @@ export function formatItem(item) {
  * @param {import('../game/item.js').Item|undefined} item
  * @param {import('../game/item.js').ArmorItem|null} equippedArmor
  * @param {import('../game/item.js').WeaponItem|null} equippedWeapon
+ * @param {[import('../game/item.js').RingItem|null, import('../game/item.js').RingItem|null]} equippedRings
  * @returns {string}
  */
-export function getInventoryHints(item, equippedArmor, equippedWeapon) {
+export function getInventoryHints(item, equippedArmor, equippedWeapon, equippedRings) {
   if (!item) return 'Esc: close';
   const hints = [];
   if (item.type === 'weapon') hints.push(item === equippedWeapon ? 'w: unwield' : 'w: wield');
@@ -36,7 +37,9 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon) {
   if (item.type === 'food')   hints.push('e: eat');
   if (item.type === 'potion') hints.push('q: quaff');
   if (item.type === 'scroll') hints.push('r: read');
-  const canDrop = item !== equippedArmor && item !== equippedWeapon;
+  if (item.type === 'ring')   hints.push(equippedRings?.includes(item) ? 'p: remove' : 'p: put on');
+  const isEquippedRing = item.type === 'ring' && equippedRings?.includes(item);
+  const canDrop = item !== equippedArmor && item !== equippedWeapon && !isEquippedRing;
   if (canDrop) hints.push('d: drop');
   hints.push('Esc: close');
   return hints.join('   ');
@@ -45,7 +48,7 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon) {
 /**
  * Render the inventory list into the given box.
  * Items are labelled a), b), c)…  Equipped armor is marked [worn],
- * wielded weapon is marked [wielded].
+ * wielded weapon is marked [wielded], equipped rings are marked [left]/[right].
  * A '>' cursor marks the currently highlighted item.
  * The block is centered vertically; each line is indented to center the
  * widest entry horizontally.
@@ -54,20 +57,24 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon) {
  * @param {import('../game/item.js').ArmorItem|null} equippedArmor
  * @param {import('../game/item.js').WeaponItem|null} equippedWeapon
  * @param {number} selectedIdx
+ * @param {[import('../game/item.js').RingItem|null, import('../game/item.js').RingItem|null]} [equippedRings]
  */
-export function renderInventory(box, inventory, equippedArmor, equippedWeapon, selectedIdx) {
+export function renderInventory(box, inventory, equippedArmor, equippedWeapon, selectedIdx, equippedRings) {
   const title = 'Inventory';
+  const rings = equippedRings ?? [null, null];
   const itemLines = inventory.length === 0
     ? ['  (nothing)']
     : inventory.map((item, i) => {
-        const cursor = i === selectedIdx ? '>' : ' ';
-        const detail = formatItem(item);
+        const cursor  = i === selectedIdx ? '>' : ' ';
+        const detail  = formatItem(item);
         const worn    = item === equippedArmor  ? ' [worn]'    : '';
         const wielded = item === equippedWeapon ? ' [wielded]' : '';
-        return `${cursor} ${detail}${worn}${wielded}`;
+        const left    = rings[0] === item ? ' [left]'  : '';
+        const right   = rings[1] === item ? ' [right]' : '';
+        return `${cursor} ${detail}${worn}${wielded}${left}${right}`;
       });
 
-  const hints = getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon);
+  const hints = getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon, rings);
   const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ to navigate', hints];
   const W = Math.max(...block.map(l => l.length));
   const hPad = ' '.repeat(Math.max(0, Math.floor((COLS - W) / 2)));

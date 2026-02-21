@@ -208,20 +208,40 @@ function handleDeath(state) {
 }
 
 /**
- * Recompute player.defense from baseDefense plus any equipped armor.
+ * Recompute ring bonus fields from all equipped rings.
+ * Effects: 'protection' → +1 ringDefenseBonus, 'increase damage' → +1 ringDamageBonus,
+ * 'dexterity' → +1 ringHitBonus. All other rings are stubs (no stat change).
  * @param {import('./player.js').Player} player
  */
-function recomputeDefense(player) {
-  player.defense = player.baseDefense + (player.equippedArmor?.ac ?? 0);
+function recomputeRings(player) {
+  let defense = 0, damage = 0, hit = 0;
+  for (const ring of player.equippedRings) {
+    if (!ring) continue;
+    const effect = ring.name.replace(/^ring of /, '');
+    if (effect === 'protection')       defense += 1;
+    else if (effect === 'increase damage') damage += 1;
+    else if (effect === 'dexterity')   hit    += 1;
+  }
+  player.ringDefenseBonus = defense;
+  player.ringDamageBonus  = damage;
+  player.ringHitBonus     = hit;
 }
 
 /**
- * Recompute player.hitBonus and player.damageBonus from equipped weapon.
+ * Recompute player.defense from baseDefense plus any equipped armor and rings.
+ * @param {import('./player.js').Player} player
+ */
+function recomputeDefense(player) {
+  player.defense = player.baseDefense + (player.equippedArmor?.ac ?? 0) + player.ringDefenseBonus;
+}
+
+/**
+ * Recompute player.hitBonus and player.damageBonus from equipped weapon and rings.
  * @param {import('./player.js').Player} player
  */
 function recomputeWeapon(player) {
-  player.hitBonus    = player.equippedWeapon?.hitBonus    ?? 0;
-  player.damageBonus = player.equippedWeapon?.damageBonus ?? 0;
+  player.hitBonus    = (player.equippedWeapon?.hitBonus    ?? 0) + player.ringHitBonus;
+  player.damageBonus = (player.equippedWeapon?.damageBonus ?? 0) + player.ringDamageBonus;
 }
 
 /**
@@ -273,6 +293,45 @@ export function removeArmor(state) {
 }
 
 /**
+ * Equip a ring in the specified slot (0 = left, 1 = right).
+ * No-op if slotIndex is invalid or the slot is already occupied.
+ * @param {GameState} state
+ * @param {import('./item.js').RingItem} ring
+ * @param {0|1} slotIndex
+ */
+export function putOnRing(state, ring, slotIndex) {
+  if (slotIndex !== 0 && slotIndex !== 1) return;
+  if (state.player.equippedRings[slotIndex]) {
+    state.messages = ['You are already wearing a ring on that hand'];
+    return;
+  }
+  state.player.equippedRings[slotIndex] = ring;
+  recomputeRings(state.player);
+  recomputeDefense(state.player);
+  recomputeWeapon(state.player);
+  const side = slotIndex === 0 ? 'left' : 'right';
+  state.messages = [`You put on ${ring.name} (${side} hand)`];
+}
+
+/**
+ * Remove the ring from the specified slot (0 = left, 1 = right).
+ * No-op if slotIndex is invalid or the slot is empty.
+ * @param {GameState} state
+ * @param {0|1} slotIndex
+ */
+export function removeRing(state, slotIndex) {
+  if (slotIndex !== 0 && slotIndex !== 1) return;
+  const ring = state.player.equippedRings[slotIndex];
+  if (!ring) return;
+  state.player.equippedRings[slotIndex] = null;
+  recomputeRings(state.player);
+  recomputeDefense(state.player);
+  recomputeWeapon(state.player);
+  const side = slotIndex === 0 ? 'left' : 'right';
+  state.messages = [`You remove ${ring.name} (${side} hand)`];
+}
+
+/**
  * Drop an item from the player's inventory onto the current tile.
  * If the item is equipped armor, it is removed first.
  * @param {GameState} state
@@ -299,6 +358,10 @@ export function dropItem(state, item) {
   }
   if (item === state.player.equippedWeapon) {
     state.messages = ["Unwield it before dropping"];
+    return;
+  }
+  if (state.player.equippedRings.includes(item)) {
+    state.messages = ["Remove it before dropping"];
     return;
   }
   state.player.inventory.splice(idx, 1);

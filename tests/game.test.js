@@ -14,6 +14,12 @@ import {
   quaffPotion,
   readScroll,
   cheatRankUp,
+  wearArmor,
+  removeArmor,
+  wieldWeapon,
+  unwieldWeapon,
+  putOnRing,
+  removeRing,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
@@ -939,4 +945,154 @@ describe('readScroll — stub scrolls', () => {
       expect(state.messages[0]).toMatch(pattern);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// putOnRing / removeRing
+// ---------------------------------------------------------------------------
+
+import { createRing } from '../src/game/item.js';
+
+describe('putOnRing / removeRing', () => {
+  let state;
+
+  beforeEach(() => {
+    state = createGame({ seed: 1 });
+  });
+
+  /** Helper: add a ring of the given effect to player inventory and return it. */
+  function giveRing(effect) {
+    const ring = createRing(effect);
+    state.player.inventory.push(ring);
+    return ring;
+  }
+
+  test('player starts with equippedRings [null, null]', () => {
+    expect(state.player.equippedRings).toEqual([null, null]);
+  });
+
+  test('player starts with all ring bonus fields at 0', () => {
+    expect(state.player.ringDefenseBonus).toBe(0);
+    expect(state.player.ringDamageBonus).toBe(0);
+    expect(state.player.ringHitBonus).toBe(0);
+  });
+
+  test('putOnRing equips ring to slot 0', () => {
+    const ring = giveRing('protection');
+    putOnRing(state, ring, 0);
+    expect(state.player.equippedRings[0]).toBe(ring);
+  });
+
+  test('putOnRing equips ring to slot 1 and message says "right"', () => {
+    const ring = giveRing('dexterity');
+    putOnRing(state, ring, 1);
+    expect(state.player.equippedRings[1]).toBe(ring);
+    expect(state.messages[0]).toMatch(/right/i);
+  });
+
+  test('putOnRing message includes ring name and "left"', () => {
+    const ring = giveRing('protection');
+    putOnRing(state, ring, 0);
+    expect(state.messages[0]).toMatch(/ring of protection/);
+    expect(state.messages[0]).toMatch(/left/i);
+  });
+
+  test('putOnRing rejects occupied slot and leaves existing ring unchanged', () => {
+    const ring1 = giveRing('protection');
+    const ring2 = giveRing('dexterity');
+    putOnRing(state, ring1, 0);
+    putOnRing(state, ring2, 0);
+    expect(state.player.equippedRings[0]).toBe(ring1);
+    expect(state.messages[0]).toMatch(/already wearing/i);
+  });
+
+  test('can equip two different rings simultaneously', () => {
+    const ring1 = giveRing('protection');
+    const ring2 = giveRing('increase damage');
+    putOnRing(state, ring1, 0);
+    putOnRing(state, ring2, 1);
+    expect(state.player.equippedRings[0]).toBe(ring1);
+    expect(state.player.equippedRings[1]).toBe(ring2);
+  });
+
+  test('removeRing clears the slot', () => {
+    const ring = giveRing('protection');
+    putOnRing(state, ring, 0);
+    removeRing(state, 0);
+    expect(state.player.equippedRings[0]).toBeNull();
+  });
+
+  test('removeRing message includes ring name', () => {
+    const ring = giveRing('dexterity');
+    putOnRing(state, ring, 0);
+    removeRing(state, 0);
+    expect(state.messages[0]).toMatch(/ring of dexterity/);
+  });
+
+  test('removeRing on empty slot does not throw', () => {
+    expect(() => removeRing(state, 0)).not.toThrow();
+  });
+
+  test('protection ring adds +1 to player.defense', () => {
+    const before = state.player.defense;
+    const ring = giveRing('protection');
+    putOnRing(state, ring, 0);
+    expect(state.player.defense).toBe(before + 1);
+  });
+
+  test('two protection rings add +2 to ringDefenseBonus', () => {
+    putOnRing(state, giveRing('protection'), 0);
+    putOnRing(state, giveRing('protection'), 1);
+    expect(state.player.ringDefenseBonus).toBe(2);
+    expect(state.player.defense).toBe(state.player.baseDefense + (state.player.equippedArmor?.ac ?? 0) + 2);
+  });
+
+  test('increase damage ring adds +1 to player.damageBonus', () => {
+    const before = state.player.damageBonus;
+    const ring = giveRing('increase damage');
+    putOnRing(state, ring, 0);
+    expect(state.player.damageBonus).toBe(before + 1);
+  });
+
+  test('dexterity ring adds +1 to player.hitBonus', () => {
+    const before = state.player.hitBonus;
+    const ring = giveRing('dexterity');
+    putOnRing(state, ring, 0);
+    expect(state.player.hitBonus).toBe(before + 1);
+  });
+
+  test('stub ring (slow digestion) does not change any stat', () => {
+    const before = { defense: state.player.defense, hitBonus: state.player.hitBonus, damageBonus: state.player.damageBonus };
+    putOnRing(state, giveRing('slow digestion'), 0);
+    expect(state.player.defense).toBe(before.defense);
+    expect(state.player.hitBonus).toBe(before.hitBonus);
+    expect(state.player.damageBonus).toBe(before.damageBonus);
+  });
+
+  test('removing protection ring restores defense to pre-ring value', () => {
+    const before = state.player.defense;
+    const ring = giveRing('protection');
+    putOnRing(state, ring, 0);
+    removeRing(state, 0);
+    expect(state.player.defense).toBe(before);
+  });
+
+  test('ring defense bonus persists through wearArmor / removeArmor cycle', () => {
+    const ring = giveRing('protection');
+    putOnRing(state, ring, 0);
+    const bonusedDefense = state.player.defense;
+    wearArmor(state, state.player.equippedArmor); // re-equip same armor — triggers recomputeDefense
+    expect(state.player.ringDefenseBonus).toBe(1);
+    expect(state.player.defense).toBe(bonusedDefense);
+  });
+
+  test('ring hit bonus persists through unwieldWeapon / wieldWeapon cycle', () => {
+    const ring = giveRing('dexterity');
+    putOnRing(state, ring, 0);
+    const beforeHit = state.player.hitBonus;
+    const weapon = state.player.inventory.find(i => i.type === 'weapon');
+    unwieldWeapon(state);
+    wieldWeapon(state, weapon);
+    expect(state.player.hitBonus).toBe(beforeHit);
+  });
 });
