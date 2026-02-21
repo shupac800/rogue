@@ -626,7 +626,10 @@ export function readScroll(state, item) {
     case 'identify':           state.messages = ['You feel knowledgeable']; break;
     case 'scare monster':      state.messages = ['The monsters seem frightened']; break;
     case 'hold monster':       state.messages = ['The monsters freeze momentarily']; break;
-    case 'aggravate monsters': state.messages = ['You hear the monsters stir']; break;
+    case 'aggravate monsters':
+      for (const m of state.monsters) { m.aggression = 3; m.provoked = true; }
+      state.messages = ['You hear the monsters stir angrily'];
+      break;
     case 'remove curse':       state.messages = ['You feel a sense of relief']; break;
     case 'protect armor':      state.messages = ['Your armor glows briefly']; break;
     default: state.messages = ['Nothing happens'];

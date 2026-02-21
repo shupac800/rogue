@@ -926,17 +926,36 @@ describe('readScroll — create monster', () => {
   });
 });
 
+describe('readScroll — aggravate monsters', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); });
+
+  test('sets all monsters aggression to 3', () => {
+    readScroll(state, giveScroll(state, 'aggravate monsters'));
+    for (const m of state.monsters) expect(m.aggression).toBe(3);
+  });
+
+  test('marks all monsters as provoked', () => {
+    readScroll(state, giveScroll(state, 'aggravate monsters'));
+    for (const m of state.monsters) expect(m.provoked).toBe(true);
+  });
+
+  test('sets a message', () => {
+    readScroll(state, giveScroll(state, 'aggravate monsters'));
+    expect(state.messages[0]).toMatch(/stir/i);
+  });
+});
+
 describe('readScroll — stub scrolls', () => {
   let state;
   beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
 
   const stubs = [
-    ['identify',           /knowledgeable/i],
-    ['scare monster',      /frightened/i],
-    ['hold monster',       /freeze/i],
-    ['aggravate monsters', /stir/i],
-    ['remove curse',       /relief/i],
-    ['protect armor',      /glows briefly/i],
+    ['identify',      /knowledgeable/i],
+    ['scare monster', /frightened/i],
+    ['hold monster',  /freeze/i],
+    ['remove curse',  /relief/i],
+    ['protect armor', /glows briefly/i],
   ];
 
   for (const [title, pattern] of stubs) {
