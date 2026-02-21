@@ -8,10 +8,11 @@ import { TILE } from '../dungeon/tiles.js';
 import { generate, createRng } from '../dungeon/generator.js';
 import { computeFov } from '../fov/index.js';
 import { findRoomContaining } from '../dungeon/room.js';
-import { createPlayer, xpToLevel, RANKS, REGEN_RATES, HP_PER_RANK } from './player.js';
+import { createPlayer, xpToLevel, RANKS, REGEN_RATES, HP_PER_RANK, XP_THRESHOLDS } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 import { generateDungeonItem } from './item.js';
+import { createMonster, monstersForLevel } from './monster.js';
 
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 1;
@@ -203,7 +204,7 @@ function revealRoom(map, room) {
 function handleDeath(state) {
   if (state.player.hp > 0 || state.dead) return;
   state.dead = true;
-  state.messages.push('You died');
+  state.messages.push('You have died');
 }
 
 /**
@@ -359,14 +360,14 @@ export function quaffPotion(state, item) {
       const newLevel = Math.min(RANKS.length - 1, player.xpLevel + 1);
       if (newLevel > player.xpLevel) {
         promotePlayer(player, player.xpLevel, newLevel);
-        state.messages = [`You have earned the rank of ${player.rank}`];
+        state.messages = ['You suddenly feel more skillful',`You have earned the rank of ${player.rank}`];
       } else {
-        state.messages = ['You feel more experienced'];
+        state.messages = ['You feel more experienced, but it has no effect'];
       }
       break;
     }
     default:
-      state.messages = ['You feel strange'];
+      state.messages = ['Red Bull gives you wings? Nothing happens'];
   }
 }
 
@@ -450,7 +451,7 @@ export function ascendStairs(state) {
  * @param {number} newLevel
  */
 function promotePlayer(player, prevLevel, newLevel) {
-  const ratio = player.hp / player.maxHp;
+  const ratio = player.hp / player.maxHp; // how healthy are we right now?
   for (let lv = prevLevel + 1; lv <= newLevel; lv++) player.maxHp += HP_PER_RANK[lv];
   player.hp = Math.max(1, Math.round(ratio * player.maxHp));
   player.xpLevel = newLevel;
@@ -464,8 +465,9 @@ function promotePlayer(player, prevLevel, newLevel) {
 export function cheatRankUp(state) {
   const newLevel = Math.min(RANKS.length - 1, state.player.xpLevel + 1);
   if (newLevel > state.player.xpLevel) {
+    state.player.xp = XP_THRESHOLDS[newLevel];
     promotePlayer(state.player, state.player.xpLevel, newLevel);
-    state.messages = [`[CHEAT] You have earned the rank of ${state.player.rank}`];
+    state.messages = [`You have cheated your way to ${state.player.rank}`];
   }
 }
 
@@ -479,6 +481,93 @@ function regenHp(state) {
   if (state.dead || player.hp >= player.maxHp) return;
   const rate = REGEN_RATES[player.xpLevel];
   if (state.turn % rate === 0) player.hp += 1;
+}
+
+/**
+ * Read a scroll: consume it from inventory and apply its effect.
+ * @param {GameState} state
+ * @param {import('./item.js').ScrollItem} item
+ */
+export function readScroll(state, item) {
+  const idx = state.player.inventory.indexOf(item);
+  if (idx === -1) return;
+  state.player.inventory.splice(idx, 1);
+  const effect = item.name.replace(/^scroll of /, '');
+  const { player, dungeon } = state;
+  switch (effect) {
+    case 'enchant weapon': {
+      if (!player.equippedWeapon) { state.messages = ['Nothing happens']; break; }
+      player.equippedWeapon.hitBonus    += 1;
+      player.equippedWeapon.damageBonus += 1;
+      recomputeWeapon(player);
+      state.messages = ['Your weapon glows blue'];
+      break;
+    }
+    case 'enchant armor': {
+      if (!player.equippedArmor) { state.messages = ['Nothing happens']; break; }
+      player.equippedArmor.ac += 1;
+      recomputeDefense(player);
+      state.messages = ['Your armor glows blue'];
+      break;
+    }
+    case 'magic mapping': {
+      for (const row of dungeon.map)
+        for (const cell of row) cell.visited = true;
+      state.messages = ['The dungeon layout flashes before your eyes'];
+      break;
+    }
+    case 'teleportation': {
+      const candidates = [];
+      for (let ty = 0; ty < dungeon.map.length; ty++)
+        for (let tx = 0; tx < dungeon.map[ty].length; tx++)
+          if (dungeon.map[ty][tx].type === TILE.FLOOR || dungeon.map[ty][tx].type === TILE.CORRIDOR)
+            candidates.push({ x: tx, y: ty });
+      if (candidates.length > 0) {
+        const pos = candidates[Math.floor(Math.random() * candidates.length)];
+        player.x = pos.x;
+        player.y = pos.y;
+        computeFov(dungeon.map, player, SIGHT_RADIUS);
+        illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
+      }
+      state.messages = ['You feel dizzy and reappear elsewhere'];
+      break;
+    }
+    case 'light': {
+      illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
+      state.messages = ['The room floods with light'];
+      break;
+    }
+    case 'create monster': {
+      const templates = monstersForLevel(state.dungeonLevel);
+      const template = templates[Math.floor(Math.random() * templates.length)];
+      let spawned = false;
+      outer: for (let r = 1; r <= 3; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const mx = player.x + dx;
+            const my = player.y + dy;
+            if (my < 0 || my >= dungeon.map.length || mx < 0 || mx >= dungeon.map[0].length) continue;
+            if (!isWalkable(dungeon.map[my][mx].type)) continue;
+            if (state.monsters.some(m => m.x === mx && m.y === my)) continue;
+            state.monsters.push(createMonster(template, mx, my));
+            state.messages = ['You hear something stir nearby'];
+            spawned = true;
+            break outer;
+          }
+        }
+      }
+      if (!spawned) state.messages = ['Nothing happens'];
+      break;
+    }
+    case 'identify':           state.messages = ['You feel knowledgeable']; break;
+    case 'scare monster':      state.messages = ['The monsters seem frightened']; break;
+    case 'hold monster':       state.messages = ['The monsters freeze momentarily']; break;
+    case 'aggravate monsters': state.messages = ['You hear the monsters stir']; break;
+    case 'remove curse':       state.messages = ['You feel a sense of relief']; break;
+    case 'protect armor':      state.messages = ['Your armor glows briefly']; break;
+    default: state.messages = ['Nothing happens'];
+  }
 }
 
 /**

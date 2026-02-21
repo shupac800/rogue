@@ -34,7 +34,7 @@ export const RANKS = [
 ];
 
 /** Minimum XP required for each rank level. */
-const XP_THRESHOLDS = [
+export const XP_THRESHOLDS = [
   0, 5, 20, 80, 200,
   500, 1000, 2000, 4000, 8000,
   15000, 30000, 60000, 120000, 250000,

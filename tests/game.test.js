@@ -2,7 +2,7 @@
  * Tests for src/game/player.js and src/game/state.js
  */
 
-import { createPlayer, REGEN_RATES, HP_PER_RANK } from '../src/game/player.js';
+import { createPlayer, REGEN_RATES, HP_PER_RANK, XP_THRESHOLDS } from '../src/game/player.js';
 import {
   createGame,
   movePlayer,
@@ -12,6 +12,8 @@ import {
   descendStairs,
   ascendStairs,
   quaffPotion,
+  readScroll,
+  cheatRankUp,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
@@ -681,4 +683,260 @@ describe('HP on rank-up', () => {
     raiseLevel(state);
     expect(state.player.hp).toBeGreaterThanOrEqual(1);
   });
+});
+
+// ---------------------------------------------------------------------------
+// cheatRankUp
+// ---------------------------------------------------------------------------
+
+describe('cheatRankUp', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('increments xpLevel by 1', () => {
+    const before = state.player.xpLevel;
+    cheatRankUp(state);
+    expect(state.player.xpLevel).toBe(before + 1);
+  });
+
+  test('sets player.xp to the XP_THRESHOLDS for the new level', () => {
+    cheatRankUp(state);
+    expect(state.player.xp).toBe(XP_THRESHOLDS[state.player.xpLevel]);
+  });
+
+  test('updates rank string', () => {
+    cheatRankUp(state);
+    expect(state.player.rank).toBeTruthy();
+    expect(typeof state.player.rank).toBe('string');
+  });
+
+  test('increases maxHp', () => {
+    const before = state.player.maxHp;
+    cheatRankUp(state);
+    expect(state.player.maxHp).toBeGreaterThan(before);
+  });
+
+  test('sets a cheat message', () => {
+    cheatRankUp(state);
+    expect(state.messages[0]).toMatch(/cheat|rank/i);
+  });
+
+  test('no-op at max rank', () => {
+    state.player.xpLevel = 14; // RANKS.length - 1
+    state.player.rank = 'Wizard';
+    cheatRankUp(state);
+    expect(state.player.xpLevel).toBe(14);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readScroll
+// ---------------------------------------------------------------------------
+
+/** Helper: give the player a scroll and return it. */
+function giveScroll(state, title) {
+  const scroll = { type: 'scroll', name: `scroll of ${title}` };
+  state.player.inventory.push(scroll);
+  return scroll;
+}
+
+describe('readScroll — scroll consumed', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('removes the scroll from inventory (identify)', () => {
+    const s = giveScroll(state, 'identify');
+    const before = state.player.inventory.length;
+    readScroll(state, s);
+    expect(state.player.inventory.length).toBe(before - 1);
+    expect(state.player.inventory.includes(s)).toBe(false);
+  });
+
+  test('removes the scroll from inventory (enchant weapon)', () => {
+    const s = giveScroll(state, 'enchant weapon');
+    const before = state.player.inventory.length;
+    readScroll(state, s);
+    expect(state.player.inventory.length).toBe(before - 1);
+  });
+
+  test('no-op when item is not in inventory', () => {
+    const s = { type: 'scroll', name: 'scroll of identify' };
+    const before = state.player.inventory.length;
+    readScroll(state, s);
+    expect(state.player.inventory.length).toBe(before);
+  });
+});
+
+describe('readScroll — enchant weapon', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('increases equippedWeapon hitBonus by 1', () => {
+    const before = state.player.equippedWeapon.hitBonus;
+    readScroll(state, giveScroll(state, 'enchant weapon'));
+    expect(state.player.equippedWeapon.hitBonus).toBe(before + 1);
+  });
+
+  test('increases equippedWeapon damageBonus by 1', () => {
+    const before = state.player.equippedWeapon.damageBonus;
+    readScroll(state, giveScroll(state, 'enchant weapon'));
+    expect(state.player.equippedWeapon.damageBonus).toBe(before + 1);
+  });
+
+  test('updates player.hitBonus via recomputeWeapon', () => {
+    const before = state.player.hitBonus;
+    readScroll(state, giveScroll(state, 'enchant weapon'));
+    expect(state.player.hitBonus).toBe(before + 1);
+  });
+
+  test('updates player.damageBonus via recomputeWeapon', () => {
+    const before = state.player.damageBonus;
+    readScroll(state, giveScroll(state, 'enchant weapon'));
+    expect(state.player.damageBonus).toBe(before + 1);
+  });
+
+  test('no-op when no weapon equipped', () => {
+    state.player.equippedWeapon = null;
+    const s = giveScroll(state, 'enchant weapon');
+    readScroll(state, s);
+    expect(state.messages[0]).toMatch(/nothing happens/i);
+  });
+});
+
+describe('readScroll — enchant armor', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('increases equippedArmor.ac by 1', () => {
+    const before = state.player.equippedArmor.ac;
+    readScroll(state, giveScroll(state, 'enchant armor'));
+    expect(state.player.equippedArmor.ac).toBe(before + 1);
+  });
+
+  test('updates player.defense via recomputeDefense', () => {
+    const before = state.player.defense;
+    readScroll(state, giveScroll(state, 'enchant armor'));
+    expect(state.player.defense).toBe(before + 1);
+  });
+
+  test('no-op when no armor equipped', () => {
+    state.player.equippedArmor = null;
+    readScroll(state, giveScroll(state, 'enchant armor'));
+    expect(state.messages[0]).toMatch(/nothing happens/i);
+  });
+});
+
+describe('readScroll — magic mapping', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('marks all map cells as visited', () => {
+    readScroll(state, giveScroll(state, 'magic mapping'));
+    const { map } = state.dungeon;
+    for (const row of map)
+      for (const cell of row)
+        expect(cell.visited).toBe(true);
+  });
+});
+
+describe('readScroll — teleportation', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('moves the player to a different position', () => {
+    const origX = state.player.x;
+    const origY = state.player.y;
+    // Run several times to reduce flakiness (player might teleport to same spot)
+    let moved = false;
+    for (let i = 0; i < 10 && !moved; i++) {
+      const s = giveScroll(state, 'teleportation');
+      readScroll(state, s);
+      if (state.player.x !== origX || state.player.y !== origY) moved = true;
+    }
+    expect(moved).toBe(true);
+  });
+
+  test('new player position is walkable', () => {
+    readScroll(state, giveScroll(state, 'teleportation'));
+    const { map } = state.dungeon;
+    expect(isWalkable(map[state.player.y][state.player.x].type)).toBe(true);
+  });
+
+  test('sets a dizzy message', () => {
+    readScroll(state, giveScroll(state, 'teleportation'));
+    expect(state.messages[0]).toMatch(/dizzy/i);
+  });
+});
+
+describe('readScroll — light', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('illuminated room cells become alwaysVisible', () => {
+    const { dungeon: { map, rooms }, player } = state;
+    // Reset alwaysVisible on the player's room first
+    const room = rooms.find(r =>
+      player.x >= r.x && player.x < r.x + r.width &&
+      player.y >= r.y && player.y < r.y + r.height
+    );
+    if (room) {
+      for (let dy = -1; dy <= room.height; dy++)
+        for (let dx = -1; dx <= room.width; dx++) {
+          const cell = map[room.y + dy]?.[room.x + dx];
+          if (cell) cell.alwaysVisible = false;
+        }
+      room.illuminated = true;
+    }
+    readScroll(state, giveScroll(state, 'light'));
+    if (room) {
+      const cx = room.x + Math.floor(room.width / 2);
+      const cy = room.y + Math.floor(room.height / 2);
+      expect(map[cy][cx].alwaysVisible).toBe(true);
+    }
+  });
+});
+
+describe('readScroll — create monster', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('increases monster count by 1 when space is available', () => {
+    const before = state.monsters.length;
+    readScroll(state, giveScroll(state, 'create monster'));
+    expect(state.monsters.length).toBe(before + 1);
+  });
+
+  test('new monster is within 3 tiles of the player', () => {
+    readScroll(state, giveScroll(state, 'create monster'));
+    const m = state.monsters[state.monsters.length - 1];
+    const dist = Math.max(Math.abs(m.x - state.player.x), Math.abs(m.y - state.player.y));
+    expect(dist).toBeLessThanOrEqual(3);
+  });
+
+  test('new monster is on a walkable tile', () => {
+    readScroll(state, giveScroll(state, 'create monster'));
+    const m = state.monsters[state.monsters.length - 1];
+    expect(isWalkable(state.dungeon.map[m.y][m.x].type)).toBe(true);
+  });
+});
+
+describe('readScroll — stub scrolls', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  const stubs = [
+    ['identify',           /knowledgeable/i],
+    ['scare monster',      /frightened/i],
+    ['hold monster',       /freeze/i],
+    ['aggravate monsters', /stir/i],
+    ['remove curse',       /relief/i],
+    ['protect armor',      /glows briefly/i],
+  ];
+
+  for (const [title, pattern] of stubs) {
+    test(`${title} sets a message without throwing`, () => {
+      readScroll(state, giveScroll(state, title));
+      expect(state.messages[0]).toMatch(pattern);
+    });
+  }
 });
