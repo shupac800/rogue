@@ -656,6 +656,7 @@ export function movePlayer(state, dx, dy) {
 
   const target = monsters.find(m => m.hp > 0 && m.x === nx && m.y === ny);
   if (target) {
+    target.provoked = true;
     const { hit, tier } = resolveCombat(player, target);
     if (!hit) {
       state.messages.push(`You miss the ${target.name}`);

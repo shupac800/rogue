@@ -8,8 +8,10 @@ import { spawnMonsters, stepMonsters } from '../src/game/ai.js';
 import { generate } from '../src/dungeon/generator.js';
 import { TILE } from '../src/dungeon/tiles.js';
 
-/** Bat template — level 1, simple stats. */
+/** Bat template — level 1, aggression 0 (passive). */
 const BAT = MONSTER_TABLE.find(m => m.name === 'Bat');
+/** Hobgoblin template — level 1, aggression 1 (medium). */
+const HOBGOBLIN = MONSTER_TABLE.find(m => m.name === 'Hobgoblin');
 
 // ---------------------------------------------------------------------------
 // createMonster
@@ -240,10 +242,10 @@ describe('stepMonsters — attack', () => {
   let dungeon;
   beforeEach(() => { dungeon = generate({ seed: 7 }); });
 
-  test('monster adjacent to player reduces player.hp', () => {
+  test('aggression-1 monster adjacent to player reduces player.hp', () => {
     const center = nonStartCenter(dungeon);
     const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
-    const monster = createMonster(BAT, center.x, center.y);
+    const monster = createMonster(HOBGOBLIN, center.x, center.y);
     const state = makeState(dungeon, player, [monster]);
 
     dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
@@ -256,7 +258,7 @@ describe('stepMonsters — attack', () => {
   test('attack damage is at least 1', () => {
     const center = nonStartCenter(dungeon);
     const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 100 };
-    const monster = createMonster(BAT, center.x, center.y);
+    const monster = createMonster(HOBGOBLIN, center.x, center.y);
     const state = makeState(dungeon, player, [monster]);
 
     dungeon.map[player.y][player.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
@@ -275,12 +277,12 @@ describe('stepMonsters — move', () => {
   let dungeon;
   beforeEach(() => { dungeon = generate({ seed: 7 }); });
 
-  test('monster in range but not adjacent moves closer to player', () => {
+  test('aggression-1 monster in range but not adjacent moves closer to player', () => {
     const center = nonStartCenter(dungeon);
     const mx = center.x - 3;
     const my = center.y;
     const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
-    const monster = createMonster(BAT, mx, my);
+    const monster = createMonster(HOBGOBLIN, mx, my);
     const state = makeState(dungeon, player, [monster]);
 
     for (let x = mx; x <= center.x; x++) {
@@ -320,6 +322,125 @@ describe('stepMonsters — wait', () => {
 // ---------------------------------------------------------------------------
 // dead monster cleanup
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// aggression behavior
+// ---------------------------------------------------------------------------
+
+describe('aggression 0 — passive', () => {
+  let dungeon;
+  beforeEach(() => { dungeon = generate({ seed: 7 }); });
+
+  function floorRow(dungeon, y, x1, x2) {
+    for (let x = x1; x <= x2; x++)
+      dungeon.map[y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+  }
+
+  test('unprovoked passive monster does not move toward player within sight', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3;
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(BAT, mx, center.y);
+    floorRow(dungeon, center.y, mx, center.x);
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state);
+    expect(monster.x).toBe(mx);
+  });
+
+  test('unprovoked passive monster adjacent to player does not attack', () => {
+    const center = nonStartCenter(dungeon);
+    const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(BAT, center.x, center.y);
+    dungeon.map[center.y][center.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    dungeon.map[center.y][center.x + 1] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state, () => 0.99);
+    expect(player.hp).toBe(20);
+  });
+
+  test('provoked passive monster moves toward player', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3;
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(BAT, mx, center.y);
+    monster.provoked = true;
+    floorRow(dungeon, center.y, mx, center.x);
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state);
+    expect(monster.x).toBeGreaterThan(mx);
+  });
+
+  test('provoked passive monster attacks when adjacent', () => {
+    const center = nonStartCenter(dungeon);
+    const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(BAT, center.x, center.y);
+    monster.provoked = true;
+    dungeon.map[center.y][center.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    dungeon.map[center.y][center.x + 1] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state, () => 0.99);
+    expect(player.hp).toBeLessThan(20);
+  });
+});
+
+describe('aggression 2 — roaming', () => {
+  let dungeon;
+  beforeEach(() => { dungeon = generate({ seed: 7 }); });
+
+  /** Build a monster with aggression 2 by overriding the field. */
+  function makeRoamer(x, y) {
+    const m = createMonster(HOBGOBLIN, x, y);
+    m.aggression = 2;
+    return m;
+  }
+
+  test('roaming monster beyond pursuit range moves (wanders)', () => {
+    const center = nonStartCenter(dungeon);
+    // Place player 6 tiles away (beyond PURSUIT_SIGHT=4, within MONSTER_SIGHT=8)
+    const mx = center.x;
+    const player = { x: center.x + 6, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    for (let x = mx; x <= player.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const monster = makeRoamer(mx, center.y);
+    const state = makeState(dungeon, player, [monster]);
+    const origX = monster.x;
+    const origY = monster.y;
+    stepMonsters(state, () => 0.0); // deterministic wander direction
+    expect(monster.x !== origX || monster.y !== origY).toBe(true);
+  });
+
+  test('roaming monster within pursuit range moves closer to player', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3; // 3 tiles away, within PURSUIT_SIGHT=4
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    for (let x = mx; x <= center.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const monster = makeRoamer(mx, center.y);
+    const state = makeState(dungeon, player, [monster]);
+    const beforeDist = Math.abs(player.x - monster.x);
+    stepMonsters(state);
+    expect(Math.abs(player.x - monster.x)).toBeLessThan(beforeDist);
+  });
+});
+
+describe('aggression 3 — always active', () => {
+  let dungeon;
+  beforeEach(() => { dungeon = generate({ seed: 7 }); });
+
+  test('always-active monster pursues player beyond MONSTER_SIGHT', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 12; // 12 tiles away, beyond MONSTER_SIGHT=8
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    for (let x = mx; x <= center.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const monster = createMonster(HOBGOBLIN, mx, center.y);
+    monster.aggression = 3;
+    const state = makeState(dungeon, player, [monster]);
+    const beforeDist = Math.abs(player.x - monster.x);
+    stepMonsters(state);
+    expect(Math.abs(player.x - monster.x)).toBeLessThan(beforeDist);
+  });
+});
 
 describe('dead monster cleanup', () => {
   let dungeon;
