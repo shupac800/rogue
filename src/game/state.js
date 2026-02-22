@@ -25,7 +25,13 @@ export const SIGHT_RADIUS = 1;
 function article(noun) { return /^[aeiou]/i.test(noun) ? 'an' : 'a'; }
 
 /** Maximum range (in map cells) for player-thrown missiles. */
-export const MAX_MISSILE_RANGE = 8;
+export const MAX_MISSILE_RANGE = 11;
+
+/** Chebyshev radius within which scare monster affects monsters (in addition to room). */
+export const SCARE_MONSTER_RADIUS = 10;
+
+/** Chebyshev radius within which hold monster paralyzes monsters. */
+export const HOLD_MONSTER_RADIUS = 10;
 
 /** Maximum food the player can carry. */
 const FOOD_MAX = 1300;
@@ -34,8 +40,8 @@ const FOOD_MAX = 1300;
 const HUNGER_THRESHOLDS = [
   { food: 900, msg: 'You are getting hungry' },
   { food: 400, msg: 'You are very hungry' },
-  { food: 150, msg: 'You are famished!' },
-  { food:  20, msg: 'You are starving!' },
+  { food: 150, msg: 'You are famished' },
+  { food:  20, msg: 'You are starving' },
 ];
 
 /**
@@ -145,7 +151,7 @@ export function isWalkable(type) {
 function placeGoldItems(rooms, rng, dungeonLevel, stairsUp) {
   const items = [];
   for (const room of rooms) {
-    // TODO: restore 20% chance: if (rng() >= 0.2) continue;
+    if (rng() >= 0.25) continue;
     const x = room.x + Math.floor(rng() * room.width);
     const y = room.y + Math.floor(rng() * room.height);
     const maxAmount = Math.min(80, dungeonLevel * 16);
@@ -651,6 +657,27 @@ function tickHunger(state) {
  * @param {GameState} state
  * @param {import('./item.js').ScrollItem} item
  */
+/**
+ * Return all living monsters within Chebyshev `radius` of the player,
+ * unioned with all living monsters inside the player's room (if any).
+ * @param {GameState} state
+ * @param {number} radius
+ * @returns {import('./monster.js').Monster[]}
+ */
+function monstersNearPlayer(state, radius) {
+  const { player, dungeon } = state;
+  const room = findRoomContaining(dungeon.rooms, player.x, player.y);
+  return state.monsters.filter(m => {
+    if (m.hp <= 0) return false;
+    const cheb = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
+    if (cheb <= radius) return true;
+    if (room &&
+        m.x >= room.x && m.x < room.x + room.width &&
+        m.y >= room.y && m.y < room.y + room.height) return true;
+    return false;
+  });
+}
+
 export function readScroll(state, item) {
   const idx = state.player.inventory.indexOf(item);
   if (idx === -1) return;
@@ -725,8 +752,18 @@ export function readScroll(state, item) {
       break;
     }
     case 'identify':           state.messages = ['You feel knowledgeable']; break;
-    case 'scare monster':      state.messages = ['The monsters seem frightened']; break;
-    case 'hold monster':       state.messages = ['The monsters freeze momentarily']; break;
+    case 'scare monster': {
+      const targets = monstersNearPlayer(state, SCARE_MONSTER_RADIUS);
+      for (const m of targets) m.statusEffects.scared = Math.max(m.statusEffects.scared, 10);
+      state.messages = [targets.length > 0 ? 'The monsters flee in terror!' : 'The scroll crumbles to dust'];
+      break;
+    }
+    case 'hold monster': {
+      const targets = monstersNearPlayer(state, HOLD_MONSTER_RADIUS);
+      for (const m of targets) applyEffect(m, 'paralysis', 10);
+      state.messages = [targets.length > 0 ? 'The monsters freeze!' : 'The scroll crumbles to dust'];
+      break;
+    }
     case 'aggravate monsters':
       for (const m of state.monsters) { m.aggression = 3; m.provoked = true; }
       state.messages = ['You hear the monsters stir angrily'];

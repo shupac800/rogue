@@ -104,6 +104,30 @@ function pursuePlayer(m, player, map, monsters, state, rng) {
 }
 
 /**
+ * Move a monster one step in the direction that maximizes Chebyshev distance
+ * from the player. All 8 directions are tried; if no direction improves the
+ * distance the monster stays put.
+ * @param {import('./monster.js').Monster} m
+ * @param {import('./player.js').Player} player
+ * @param {Array} map
+ * @param {import('./monster.js').Monster[]} monsters
+ */
+function fleePlayer(m, player, map, monsters) {
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+  let bestDist = Math.max(Math.abs(player.x - m.x), Math.abs(player.y - m.y));
+  let bestDx = 0, bestDy = 0;
+  for (const [dx, dy] of dirs) {
+    const tx = m.x + dx;
+    const ty = m.y + dy;
+    if (!WALKABLE.has(map[ty]?.[tx]?.type)) continue;
+    if (monsters.some(o => o !== m && o.hp > 0 && o.x === tx && o.y === ty)) continue;
+    const d = Math.max(Math.abs(player.x - tx), Math.abs(player.y - ty));
+    if (d > bestDist) { bestDist = d; bestDx = dx; bestDy = dy; }
+  }
+  if (bestDx !== 0 || bestDy !== 0) { m.x += bestDx; m.y += bestDy; }
+}
+
+/**
  * Move a monster one step in a random walkable, unoccupied direction.
  * Used by aggression-2 monsters when the player is outside pursuit range.
  * @param {import('./monster.js').Monster} m
@@ -149,6 +173,7 @@ export function stepMonsters(state, rng = Math.random) {
     const se = m.statusEffects;
     if (se) {
       if (se.paralysis > 0) { se.paralysis--; continue; }
+      if (se.scared > 0) { se.scared--; fleePlayer(m, player, map, monsters); continue; }
       if (se.confusion > 0) {
         se.confusion--;
         if (rng() >= 0.5) wanderStep(m, map, monsters, rng);

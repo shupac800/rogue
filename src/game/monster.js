@@ -5,7 +5,7 @@
 
 /**
  * @typedef {{ name:string, char:string, level:number, hp:number, attack:number, defense:number, xp:number, aggression:number }} MonsterTemplate
- * @typedef {{ x:number, y:number, hp:number, maxHp:number, attack:number, defense:number, xp:number, name:string, char:string, aggression:number, provoked:boolean, statusEffects: { paralysis: number, confusion: number } }} Monster
+ * @typedef {{ x:number, y:number, hp:number, maxHp:number, attack:number, defense:number, xp:number, name:string, char:string, aggression:number, provoked:boolean, statusEffects: { paralysis: number, confusion: number, scared: number } }} Monster
  */
 
 /**
@@ -69,5 +69,5 @@ export function monstersForLevel(dungeonLevel) {
  */
 export function createMonster(template, x, y) {
   const { name, char, hp, attack, defense, xp, aggression } = template;
-  return { x, y, hp, maxHp: hp, attack, defense, xp, name: name.toLowerCase(), char, aggression, provoked: false, statusEffects: { paralysis: 0, confusion: 0 } };
+  return { x, y, hp, maxHp: hp, attack, defense, xp, name: name.toLowerCase(), char, aggression, provoked: false, statusEffects: { paralysis: 0, confusion: 0, scared: 0 } };
 }

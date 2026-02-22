@@ -959,8 +959,6 @@ describe('readScroll — stub scrolls', () => {
 
   const stubs = [
     ['identify',      /knowledgeable/i],
-    ['scare monster', /frightened/i],
-    ['hold monster',  /freeze/i],
     ['remove curse',  /relief/i],
     ['protect armor', /glows briefly/i],
   ];
@@ -971,6 +969,67 @@ describe('readScroll — stub scrolls', () => {
       expect(state.messages[0]).toMatch(pattern);
     });
   }
+});
+
+describe('readScroll — scare monster', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('scares monsters in the same room for 10 turns', () => {
+    const room = findRoomContaining(state.dungeon.rooms, state.player.x, state.player.y);
+    expect(room).not.toBeNull();
+    const m = createMonster(MONSTER_TABLE[0], room.x, room.y);
+    state.monsters.push(m);
+    readScroll(state, giveScroll(state, 'scare monster'));
+    expect(m.statusEffects.scared).toBe(10);
+    expect(state.messages[0]).toMatch(/terror/i);
+  });
+
+  test('scares monsters within SCARE_MONSTER_RADIUS but outside the room', () => {
+    // Place monster 5 Chebyshev away from player — within radius, outside room
+    const m = createMonster(MONSTER_TABLE[0], state.player.x + 5, state.player.y);
+    state.monsters.push(m);
+    readScroll(state, giveScroll(state, 'scare monster'));
+    expect(m.statusEffects.scared).toBe(10);
+  });
+
+  test('does not scare monsters beyond radius and outside room', () => {
+    // Place monster 15 Chebyshev away — beyond SCARE_MONSTER_RADIUS=10
+    const m = createMonster(MONSTER_TABLE[0], state.player.x + 15, state.player.y);
+    state.monsters.push(m);
+    readScroll(state, giveScroll(state, 'scare monster'));
+    expect(m.statusEffects.scared).toBe(0);
+  });
+
+  test('crumbles to dust when no monsters are nearby', () => {
+    readScroll(state, giveScroll(state, 'scare monster'));
+    expect(state.messages[0]).toMatch(/crumbles/i);
+  });
+});
+
+describe('readScroll — hold monster', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 42 }); state.monsters = []; });
+
+  test('paralyzes monsters within HOLD_MONSTER_RADIUS for 10 turns', () => {
+    const m = createMonster(MONSTER_TABLE[0], state.player.x + 3, state.player.y);
+    state.monsters.push(m);
+    readScroll(state, giveScroll(state, 'hold monster'));
+    expect(m.statusEffects.paralysis).toBe(10);
+    expect(state.messages[0]).toMatch(/freeze/i);
+  });
+
+  test('does not paralyze monsters beyond radius', () => {
+    const m = createMonster(MONSTER_TABLE[0], state.player.x + 15, state.player.y);
+    state.monsters.push(m);
+    readScroll(state, giveScroll(state, 'hold monster'));
+    expect(m.statusEffects.paralysis).toBe(0);
+  });
+
+  test('crumbles to dust when no monsters are nearby', () => {
+    readScroll(state, giveScroll(state, 'hold monster'));
+    expect(state.messages[0]).toMatch(/crumbles/i);
+  });
 });
 
 // ---------------------------------------------------------------------------
