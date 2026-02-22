@@ -17,6 +17,39 @@ import { createMonster, monstersForLevel } from './monster.js';
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 1;
 
+/**
+ * Return the effective FOV radius for the player.
+ * Blindness reduces it to 0; otherwise returns SIGHT_RADIUS.
+ * @param {import('./player.js').Player} player
+ * @returns {number}
+ */
+function fovRadius(player) {
+  return player.statusEffects.blindness > 0 ? 0 : SIGHT_RADIUS;
+}
+
+/**
+ * Apply a status effect to any entity that has a statusEffects object.
+ * Uses max(current, duration) so a longer active effect is never shortened.
+ * @param {{ statusEffects: Record<string, number> }} entity
+ * @param {string} effect
+ * @param {number} duration
+ */
+export function applyEffect(entity, effect, duration) {
+  entity.statusEffects[effect] = Math.max(entity.statusEffects[effect] ?? 0, duration);
+}
+
+/**
+ * Decrement all active player status-effect counters by one turn.
+ * Pushes expiry messages when a counter reaches zero.
+ * @param {GameState} state
+ */
+function tickPlayerEffects(state) {
+  const e = state.player.statusEffects;
+  if (e.paralysis > 0 && --e.paralysis === 0) state.messages.push('You can move again');
+  if (e.confusion > 0 && --e.confusion === 0) state.messages.push('You feel less confused');
+  if (e.blindness  > 0 && --e.blindness  === 0) state.messages.push('Your vision returns');
+}
+
 /** Player-attack message for each hit tier (0 = glancing, 3 = devastating). */
 const PLAYER_HIT_MSGS = [
   name => `You hit the ${name}`,
@@ -429,6 +462,18 @@ export function quaffPotion(state, item) {
       }
       break;
     }
+    case 'confusion':
+      applyEffect(player, 'confusion', 15);
+      state.messages = ['You feel confused'];
+      break;
+    case 'paralysis':
+      applyEffect(player, 'paralysis', 15);
+      state.messages = ['You cannot move!'];
+      break;
+    case 'blindness':
+      applyEffect(player, 'blindness', 100);
+      state.messages = ['Everything goes dark'];
+      break;
     default:
       state.messages = ['Red Bull gives you wings? Nothing happens'];
   }
@@ -463,7 +508,7 @@ function changeDungeonLevel(state, newLevel, getPos, message) {
   state.goldItems = goldItems;
   state.dungeonItems = dungeonItems;
   state.messages = [message];
-  computeFov(newDungeon.map, state.player, SIGHT_RADIUS);
+  computeFov(newDungeon.map, state.player, fovRadius(state.player));
   illuminateRoomAt(newDungeon.map, newDungeon.rooms, x, y);
 }
 
@@ -589,7 +634,7 @@ export function readScroll(state, item) {
         const pos = candidates[Math.floor(Math.random() * candidates.length)];
         player.x = pos.x;
         player.y = pos.y;
-        computeFov(dungeon.map, player, SIGHT_RADIUS);
+        computeFov(dungeon.map, player, fovRadius(player));
         illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
       }
       state.messages = ['You feel dizzy and reappear elsewhere'];
@@ -648,12 +693,41 @@ export function readScroll(state, item) {
 export function movePlayer(state, dx, dy) {
   const { dungeon, player, monsters } = state;
   const { map } = dungeon;
+
+  // Paralysis: skip movement but still advance time.
+  if (player.statusEffects.paralysis > 0) {
+    state.messages = ['You are paralyzed!'];
+    state.turn += 1;
+    tickPlayerEffects(state);
+    computeFov(map, player, fovRadius(player));
+    stepMonsters(state);
+    handleDeath(state);
+    regenHp(state);
+    return;
+  }
+
+  // Confusion: ignore input and move in a random direction instead.
+  const confused = player.statusEffects.confusion > 0;
+  if (confused) {
+    const dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,0],[0,1],[1,-1],[1,0],[1,1]];
+    [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
+  }
+
   const nx = player.x + dx;
   const ny = player.y + dy;
 
-  if (ny < 0 || ny >= map.length) return;
-  if (nx < 0 || nx >= map[0].length) return;
-  if (!isWalkable(map[ny][nx].type)) return;
+  // Out-of-bounds or unwalkable: confused players waste the turn; others no-op.
+  if (ny < 0 || ny >= map.length || nx < 0 || nx >= map[0].length || !isWalkable(map[ny]?.[nx]?.type)) {
+    if (!confused) return;
+    state.messages = [];
+    state.turn += 1;
+    tickPlayerEffects(state);
+    computeFov(map, player, fovRadius(player));
+    stepMonsters(state);
+    handleDeath(state);
+    regenHp(state);
+    return;
+  }
 
   state.messages = [];
 
@@ -682,7 +756,8 @@ export function movePlayer(state, dx, dy) {
     }
     state.monsters = monsters.filter(m => m.hp > 0);
     state.turn += 1;
-    computeFov(map, player, SIGHT_RADIUS);
+    tickPlayerEffects(state);
+    computeFov(map, player, fovRadius(player));
     stepMonsters(state);
     handleDeath(state);
     regenHp(state);
@@ -697,7 +772,8 @@ export function movePlayer(state, dx, dy) {
   pickupGold(state, nx, ny);
   pickupDungeonItem(state, nx, ny);
   state.turn += 1;
-  computeFov(map, player, SIGHT_RADIUS);
+  tickPlayerEffects(state);
+  computeFov(map, player, fovRadius(player));
   stepMonsters(state);
   handleDeath(state);
   regenHp(state);

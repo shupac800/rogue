@@ -22,6 +22,7 @@ import {
   unwieldWeapon,
   putOnRing,
   removeRing,
+  applyEffect,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { TILE } from '../src/dungeon/tiles.js';
@@ -1163,5 +1164,186 @@ describe('movePlayer — leprechaun gold drop', () => {
     state.dungeon.map[hob.y][hob.x] = { type: TILE.FLOOR, visible: true, visited: false, alwaysVisible: false };
     movePlayer(state, 1, 0);
     expect(state.goldItems.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyEffect
+// ---------------------------------------------------------------------------
+
+describe('applyEffect', () => {
+  test('sets effect counter to the given duration', () => {
+    const entity = { statusEffects: { paralysis: 0 } };
+    applyEffect(entity, 'paralysis', 10);
+    expect(entity.statusEffects.paralysis).toBe(10);
+  });
+
+  test('does not shorten an already-longer effect', () => {
+    const entity = { statusEffects: { confusion: 20 } };
+    applyEffect(entity, 'confusion', 5);
+    expect(entity.statusEffects.confusion).toBe(20);
+  });
+
+  test('extends a shorter active effect', () => {
+    const entity = { statusEffects: { confusion: 3 } };
+    applyEffect(entity, 'confusion', 15);
+    expect(entity.statusEffects.confusion).toBe(15);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// movePlayer — paralysis
+// ---------------------------------------------------------------------------
+
+describe('movePlayer — paralysis', () => {
+  let state;
+  beforeEach(() => {
+    state = createGame({ seed: 1 });
+    state.monsters = [];
+    applyEffect(state.player, 'paralysis', 5);
+  });
+
+  test('player does not move while paralyzed', () => {
+    const { x, y } = state.player;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.player.x).toBe(x);
+    expect(state.player.y).toBe(y);
+  });
+
+  test('turn still advances while paralyzed', () => {
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.turn).toBe(1);
+  });
+
+  test('paralysis counter decrements each turn', () => {
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.player.statusEffects.paralysis).toBe(4);
+  });
+
+  test('expiry message pushed when paralysis reaches 0', () => {
+    state.player.statusEffects.paralysis = 1;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.player.statusEffects.paralysis).toBe(0);
+    expect(state.messages.some(m => /move again/i.test(m))).toBe(true);
+  });
+
+  test('paralyzed message is shown', () => {
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.messages[0]).toMatch(/paralyzed/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// movePlayer — confusion
+// ---------------------------------------------------------------------------
+
+describe('movePlayer — confusion', () => {
+  let state;
+  beforeEach(() => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // stable rng
+    state = createGame({ seed: 1 });
+    state.monsters = [];
+    applyEffect(state.player, 'confusion', 10);
+  });
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  test('confusion counter decrements each turn', () => {
+    movePlayer(state, 1, 0);
+    expect(state.player.statusEffects.confusion).toBe(9);
+  });
+
+  test('expiry message pushed when confusion reaches 0', () => {
+    state.player.statusEffects.confusion = 1;
+    movePlayer(state, 1, 0);
+    expect(state.player.statusEffects.confusion).toBe(0);
+    expect(state.messages.some(m => /less confused/i.test(m))).toBe(true);
+  });
+
+  test('turn advances even when confused move hits a wall', () => {
+    // Force rng to pick a direction that is a wall by using a seed where all neighbours are walls.
+    // Simpler: manually set player at a position where right is a wall and mock picks right.
+    jest.restoreAllMocks();
+    jest.spyOn(Math, 'random').mockReturnValue(0.61); // picks index 5 = [0,1] from dirs array
+    // Place player so moving down (dy=1) is a wall
+    const { map } = state.dungeon;
+    map[state.player.y + 1][state.player.x] = { type: 1, visible: false, visited: false, alwaysVisible: false }; // WALL
+    const turnBefore = state.turn;
+    movePlayer(state, 1, 0);
+    expect(state.turn).toBe(turnBefore + 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// movePlayer — blindness
+// ---------------------------------------------------------------------------
+
+describe('movePlayer — blindness', () => {
+  let state;
+  beforeEach(() => {
+    state = createGame({ seed: 1 });
+    state.monsters = [];
+    applyEffect(state.player, 'blindness', 100);
+  });
+
+  test('blindness counter decrements each turn', () => {
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.player.statusEffects.blindness).toBe(99);
+  });
+
+  test('expiry message pushed when blindness reaches 0', () => {
+    state.player.statusEffects.blindness = 1;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.messages.some(m => /vision returns/i.test(m))).toBe(true);
+  });
+
+  test('player tile remains visible while blind (radius 0 still marks origin)', () => {
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    const { player, dungeon: { map } } = state;
+    expect(map[player.y][player.x].visible).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// quaffPotion — status effect potions
+// ---------------------------------------------------------------------------
+
+describe('quaffPotion — confusion', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 1 }); state.monsters = []; });
+
+  test('potion of confusion sets confusion to 15', () => {
+    const p = { type: 'potion', name: 'potion of confusion' };
+    state.player.inventory.push(p);
+    quaffPotion(state, p);
+    expect(state.player.statusEffects.confusion).toBe(15);
+  });
+
+  test('potion of paralysis sets paralysis to 15', () => {
+    const p = { type: 'potion', name: 'potion of paralysis' };
+    state.player.inventory.push(p);
+    quaffPotion(state, p);
+    expect(state.player.statusEffects.paralysis).toBe(15);
+  });
+
+  test('potion of blindness sets blindness to 100', () => {
+    const p = { type: 'potion', name: 'potion of blindness' };
+    state.player.inventory.push(p);
+    quaffPotion(state, p);
+    expect(state.player.statusEffects.blindness).toBe(100);
+  });
+
+  test('potion of confusion sets a message', () => {
+    const p = { type: 'potion', name: 'potion of confusion' };
+    state.player.inventory.push(p);
+    quaffPotion(state, p);
+    expect(state.messages[0]).toMatch(/confused/i);
   });
 });

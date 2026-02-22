@@ -146,6 +146,15 @@ export function stepMonsters(state, rng = Math.random) {
   const { dungeon: { map }, player, monsters } = state;
   for (const m of monsters) {
     if (m.hp <= 0) continue;
+    const se = m.statusEffects;
+    if (se) {
+      if (se.paralysis > 0) { se.paralysis--; continue; }
+      if (se.confusion > 0) {
+        se.confusion--;
+        if (rng() >= 0.5) wanderStep(m, map, monsters, rng);
+        continue;
+      }
+    }
     if (m.aggression === 0 && !m.provoked) continue;
     const chebDist = Math.max(Math.abs(player.x - m.x), Math.abs(player.y - m.y));
     if (m.aggression !== 3 && chebDist > MONSTER_SIGHT) continue;

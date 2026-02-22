@@ -445,6 +445,96 @@ describe('aggression 3 — always active', () => {
 });
 
 // ---------------------------------------------------------------------------
+// monster status effects — paralysis and confusion
+// ---------------------------------------------------------------------------
+
+describe('monster statusEffects — paralysis', () => {
+  let dungeon;
+  beforeEach(() => { dungeon = generate({ seed: 7 }); });
+
+  test('paralyzed monster does not move toward player', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3;
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(HOBGOBLIN, mx, center.y);
+    monster.statusEffects.paralysis = 5;
+    for (let x = mx; x <= center.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state);
+    expect(monster.x).toBe(mx);
+  });
+
+  test('paralysis counter decrements each step', () => {
+    const center = nonStartCenter(dungeon);
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(HOBGOBLIN, center.x - 3, center.y);
+    monster.statusEffects.paralysis = 3;
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state);
+    expect(monster.statusEffects.paralysis).toBe(2);
+  });
+
+  test('monster resumes normal AI once paralysis expires', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3;
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(HOBGOBLIN, mx, center.y);
+    monster.statusEffects.paralysis = 1;
+    for (let x = mx; x <= center.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state); // paralysis expires (1→0), monster still skips this turn
+    expect(monster.x).toBe(mx); // did not move this step
+    stepMonsters(state); // now free — should move
+    expect(monster.x).toBeGreaterThan(mx);
+  });
+});
+
+describe('monster statusEffects — confusion', () => {
+  let dungeon;
+  beforeEach(() => { dungeon = generate({ seed: 7 }); });
+
+  test('confused monster does not pursue player', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3;
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(HOBGOBLIN, mx, center.y);
+    monster.statusEffects.confusion = 10;
+    for (let x = mx; x <= center.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state, () => 0.99); // rng >= 0.5: wanders, does not pursue
+    expect(monster.x).not.toBe(mx + 1); // not moving toward player
+  });
+
+  test('confusion counter decrements each step', () => {
+    const center = nonStartCenter(dungeon);
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(HOBGOBLIN, center.x - 3, center.y);
+    monster.statusEffects.confusion = 8;
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state);
+    expect(monster.statusEffects.confusion).toBe(7);
+  });
+
+  test('monster resumes normal AI once confusion expires', () => {
+    const center = nonStartCenter(dungeon);
+    const mx = center.x - 3;
+    const player = { x: center.x, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1 };
+    const monster = createMonster(HOBGOBLIN, mx, center.y);
+    monster.statusEffects.confusion = 1;
+    for (let x = mx; x <= center.x; x++)
+      dungeon.map[center.y][x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    stepMonsters(state, () => 0.0); // confusion expires (1→0), stays still (rng<0.5)
+    expect(monster.statusEffects.confusion).toBe(0);
+    stepMonsters(state); // now free — pursues player
+    expect(monster.x).toBeGreaterThan(mx);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // leprechaun — gold theft
 // ---------------------------------------------------------------------------
 
