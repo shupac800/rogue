@@ -72,6 +72,20 @@ function pursuePlayer(m, player, map, monsters, state, rng) {
     const tx = m.x + sdx;
     const ty = m.y + sdy;
     if (tx === player.x && ty === player.y) {
+      if (m.name === 'leprechaun') {
+        if (rng() < 0.25) {
+          (state.messages ??= []).push('The leprechaun misses');
+        } else {
+          const stolen = Math.min(Math.floor(player.gold * (0.1 + rng() * 0.2)), 640);
+          player.gold -= stolen;
+          const msg = stolen > 0
+            ? `The leprechaun steals ${stolen} gold and vanishes!`
+            : 'The leprechaun finds nothing to steal and vanishes!';
+          (state.messages ??= []).push(msg);
+          m.hp = 0;
+        }
+        return;
+      }
       const result = resolveCombat(m, player, rng);
       const msg = result.hit ? `The ${m.name} hits you` : `The ${m.name} misses`;
       (state.messages ??= []).push(msg);

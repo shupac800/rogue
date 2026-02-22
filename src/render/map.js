@@ -30,10 +30,10 @@ const ATTR = {
 
 /**
  * Render info (char + attr) for each dungeon item type.
- * Classic Rogue ASCII: food=:  potion=!  scroll=?  weapon=)  armor=]  ring==  wand=/
+ * Classic Rogue ASCII: food=*  potion=!  scroll=?  weapon=)  armor=]  ring==  wand=/
  */
 const ITEM_RENDER = {
-  food:   { ch: ':', attr: (7 << 9) | 0 },                     // white
+  food:   { ch: '*', attr: (7 << 9) | 0 },                     // white
   potion: { ch: '!', attr: (5 << 9) | 0 },                     // magenta
   scroll: { ch: '?', attr: (1 << 18) | (7 << 9) | 0 },         // bold white
   weapon: { ch: ')', attr: (6 << 9) | 0 },                     // cyan

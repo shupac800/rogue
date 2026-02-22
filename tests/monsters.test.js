@@ -12,6 +12,8 @@ import { TILE } from '../src/dungeon/tiles.js';
 const BAT = MONSTER_TABLE.find(m => m.name === 'Bat');
 /** Hobgoblin template — level 1, aggression 1 (medium). */
 const HOBGOBLIN = MONSTER_TABLE.find(m => m.name === 'Hobgoblin');
+/** Leprechaun template — level 2, aggression 0 (passive), steals gold on hit. */
+const LEPRECHAUN = MONSTER_TABLE.find(m => m.name === 'Leprechaun');
 
 // ---------------------------------------------------------------------------
 // createMonster
@@ -439,6 +441,89 @@ describe('aggression 3 — always active', () => {
     const beforeDist = Math.abs(player.x - monster.x);
     stepMonsters(state);
     expect(Math.abs(player.x - monster.x)).toBeLessThan(beforeDist);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// leprechaun — gold theft
+// ---------------------------------------------------------------------------
+
+describe('leprechaun — gold theft', () => {
+  let dungeon;
+  beforeEach(() => { dungeon = generate({ seed: 7 }); });
+
+  /** Place a provoked leprechaun adjacent to the player and return {state, monster}. */
+  function setup(playerGold) {
+    const center = nonStartCenter(dungeon);
+    const player = { x: center.x + 1, y: center.y, hp: 20, maxHp: 20, attack: 3, defense: 1, gold: playerGold };
+    const monster = createMonster(LEPRECHAUN, center.x, center.y);
+    monster.provoked = true;
+    dungeon.map[center.y][center.x] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    dungeon.map[center.y][center.x + 1] = { type: TILE.FLOOR, visible: true, visited: true, alwaysVisible: false };
+    const state = makeState(dungeon, player, [monster]);
+    return { state, player, monster };
+  }
+
+  test('on a hit, leprechaun is removed from state.monsters', () => {
+    const { state } = setup(100);
+    stepMonsters(state, () => 0.99); // guaranteed hit
+    expect(state.monsters.length).toBe(0);
+  });
+
+  test('on a hit, leprechaun deals no HP damage', () => {
+    const { state, player } = setup(100);
+    stepMonsters(state, () => 0.99);
+    expect(player.hp).toBe(20);
+  });
+
+  test('on a hit, steals 10% of player gold (floored)', () => {
+    const { state, player } = setup(150);
+    stepMonsters(state, () => 0.99);
+    expect(player.gold).toBe(106); // 150 - floor(150*(0.1+0.99*0.2)) = 150-44
+  });
+
+  test('stolen amount is capped at 640', () => {
+    const { state, player } = setup(8000);
+    stepMonsters(state, () => 0.99);
+    expect(player.gold).toBe(7360); // 8000 - 640
+  });
+
+  test('on a hit with 0 gold, leprechaun still vanishes', () => {
+    const { state, monster } = setup(0);
+    stepMonsters(state, () => 0.99);
+    expect(monster.hp).toBe(0);
+    expect(state.monsters.length).toBe(0);
+  });
+
+  test('on a hit with 0 gold, player gold stays at 0', () => {
+    const { state, player } = setup(0);
+    stepMonsters(state, () => 0.99);
+    expect(player.gold).toBe(0);
+  });
+
+  test('on a miss, leprechaun does not vanish', () => {
+    const { state, monster } = setup(100);
+    stepMonsters(state, () => 0.0); // guaranteed miss
+    expect(monster.hp).toBe(LEPRECHAUN.hp);
+    expect(state.monsters.length).toBe(1);
+  });
+
+  test('on a miss, player gold is unchanged', () => {
+    const { state, player } = setup(100);
+    stepMonsters(state, () => 0.0);
+    expect(player.gold).toBe(100);
+  });
+
+  test('hit message mentions stolen gold amount', () => {
+    const { state } = setup(200);
+    stepMonsters(state, () => 0.99);
+    expect(state.messages.some(m => m.includes('59') && m.includes('gold'))).toBe(true);
+  });
+
+  test('hit message with 0 gold mentions nothing to steal', () => {
+    const { state } = setup(0);
+    stepMonsters(state, () => 0.99);
+    expect(state.messages.some(m => m.includes('nothing') || m.includes('Nothing'))).toBe(true);
   });
 });
 

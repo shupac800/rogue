@@ -670,6 +670,10 @@ export function movePlayer(state, dx, dy) {
         const prevLevel = player.xpLevel;
         const newLevel = xpToLevel(player.xp);
         state.messages.push(`You have defeated the ${target.name}`);
+        if (target.name === 'leprechaun') {
+          const amount = 100 + Math.floor(Math.random() * 150);
+          state.goldItems.push({ x: target.x, y: target.y, amount });
+        }
         if (newLevel > prevLevel) {
           promotePlayer(player, prevLevel, newLevel);
           state.messages.push(`You have earned the rank of ${player.rank}`);

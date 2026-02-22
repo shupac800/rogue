@@ -3,6 +3,8 @@
  */
 
 import { createPlayer, REGEN_RATES, HP_PER_RANK, XP_THRESHOLDS } from '../src/game/player.js';
+import { MONSTER_TABLE, createMonster } from '../src/game/monster.js';
+import { jest } from '@jest/globals';
 import {
   createGame,
   movePlayer,
@@ -1113,5 +1115,53 @@ describe('putOnRing / removeRing', () => {
     unwieldWeapon(state);
     wieldWeapon(state, weapon);
     expect(state.player.hitBonus).toBe(beforeHit);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// movePlayer — leprechaun gold drop on kill
+// ---------------------------------------------------------------------------
+
+describe('movePlayer — leprechaun gold drop', () => {
+  const LEPRECHAUN_TEMPLATE = MONSTER_TABLE.find(m => m.name === 'Leprechaun');
+  const HOBGOBLIN_TEMPLATE = MONSTER_TABLE.find(m => m.name === 'Hobgoblin');
+  let state, lepX, lepY;
+
+  beforeEach(() => {
+    // Mock Math.random to guarantee a hit (>= 0.25) and lethal damage.
+    jest.spyOn(Math, 'random').mockReturnValue(0.99);
+    state = createGame({ seed: 1 });
+    state.monsters = [];
+    state.goldItems = [];
+    // Place a full-HP leprechaun one tile to the right of the player.
+    const lep = createMonster(LEPRECHAUN_TEMPLATE, state.player.x + 1, state.player.y);
+    lepX = lep.x;
+    lepY = lep.y;
+    state.monsters.push(lep);
+    state.dungeon.map[lepY][lepX] = { type: TILE.FLOOR, visible: true, visited: false, alwaysVisible: false };
+    // Boost attack so a single hit is lethal regardless of defense.
+    state.player.attack = 100;
+  });
+
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  test('killing a leprechaun adds a gold item at its position', () => {
+    movePlayer(state, 1, 0);
+    expect(state.goldItems.some(g => g.x === lepX && g.y === lepY)).toBe(true);
+  });
+
+  test('dropped gold amount is between 100 and 249 inclusive', () => {
+    movePlayer(state, 1, 0);
+    const gold = state.goldItems[0];
+    expect(gold.amount).toBeGreaterThanOrEqual(100);
+    expect(gold.amount).toBeLessThanOrEqual(249);
+  });
+
+  test('killing a non-leprechaun monster does not add a gold item', () => {
+    const hob = createMonster(HOBGOBLIN_TEMPLATE, state.player.x + 1, state.player.y);
+    state.monsters = [hob];
+    state.dungeon.map[hob.y][hob.x] = { type: TILE.FLOOR, visible: true, visited: false, alwaysVisible: false };
+    movePlayer(state, 1, 0);
+    expect(state.goldItems.length).toBe(0);
   });
 });
