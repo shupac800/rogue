@@ -168,6 +168,9 @@ function wanderStep(m, map, monsters, rng) {
  */
 export function stepMonsters(state, rng = Math.random) {
   const { dungeon: { map }, player, monsters } = state;
+  if (player.equippedRings?.some(r => r?.name === 'ring of aggravate monsters')) {
+    for (const m of monsters) { if (m.hp > 0) m.provoked = true; }
+  }
   for (const m of monsters) {
     if (m.hp <= 0) continue;
     const se = m.statusEffects;
