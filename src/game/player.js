@@ -27,7 +27,8 @@ import { createWeapon, createFood, createArmor } from './item.js';
  *   xpLevel: number,
  *   rank: string,
  *   inventory: import('./item.js').Item[],
- *   statusEffects: { paralysis: number, confusion: number, blindness: number }
+ *   statusEffects: { paralysis: number, confusion: number, blindness: number },
+ *   food: number
  * }} Player
  */
 
@@ -107,6 +108,7 @@ export function createPlayer(x, y) {
     xpLevel: 0,
     rank: RANKS[0],
     statusEffects: { paralysis: 0, confusion: 0, blindness: 0 },
+    food: 1300,
     inventory: [
       sword,
       leatherArmor,

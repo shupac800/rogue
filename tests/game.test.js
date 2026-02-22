@@ -11,6 +11,7 @@ import {
   isWalkable,
   illuminateRoomAt,
   dropItem,
+  eatFood,
   descendStairs,
   ascendStairs,
   quaffPotion,
@@ -24,6 +25,7 @@ import {
   removeRing,
   applyEffect,
   zapWand,
+  hungerLabel,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
 import { createWand } from '../src/game/item.js';
@@ -1506,5 +1508,126 @@ describe('zapWand', () => {
     zapWand(state, wand, 1, 0);
     jest.restoreAllMocks();
     expect(state.player.xp).toBeGreaterThan(xpBefore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hungerLabel
+// ---------------------------------------------------------------------------
+
+describe('hungerLabel', () => {
+  test('returns empty string when well-fed', () => {
+    expect(hungerLabel(1300)).toBe('');
+    expect(hungerLabel(901)).toBe('');
+  });
+  test('returns Hungry at threshold', () => { expect(hungerLabel(900)).toBe('Hungry'); });
+  test('returns Very Hungry at threshold', () => { expect(hungerLabel(400)).toBe('Very Hungry'); });
+  test('returns Famished at threshold', () => { expect(hungerLabel(150)).toBe('Famished'); });
+  test('returns Starving at threshold', () => { expect(hungerLabel(20)).toBe('Starving'); });
+  test('returns Starving at 0', () => { expect(hungerLabel(0)).toBe('Starving'); });
+});
+
+// ---------------------------------------------------------------------------
+// hunger — tick per turn
+// ---------------------------------------------------------------------------
+
+describe('hunger — tick per turn', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 1 }); state.monsters = []; });
+
+  test('player starts with 1300 food', () => {
+    expect(state.player.food).toBe(1300);
+  });
+
+  test('food decrements by 1 per turn', () => {
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.player.food).toBe(1299);
+  });
+
+  test('hunger message pushed when crossing 900', () => {
+    state.player.food = 901;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.messages.some(m => /getting hungry/i.test(m))).toBe(true);
+  });
+
+  test('hunger message pushed when crossing 400', () => {
+    state.player.food = 401;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.messages.some(m => /very hungry/i.test(m))).toBe(true);
+  });
+
+  test('hunger message pushed when crossing 150', () => {
+    state.player.food = 151;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.messages.some(m => /famished/i.test(m))).toBe(true);
+  });
+
+  test('hunger message pushed when crossing 20', () => {
+    state.player.food = 21;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.messages.some(m => /starving/i.test(m))).toBe(true);
+  });
+
+  test('starvation deals 1 HP damage per turn at food=0', () => {
+    state.player.food = 1;
+    state.player.hp = state.player.maxHp;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy); // food hits 0, hp -= 1
+    expect(state.player.hp).toBe(state.player.maxHp - 1);
+  });
+
+  test('food does not go below 0', () => {
+    state.player.food = 0;
+    state.player.hp = 20; // enough to survive starvation
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.player.food).toBe(0);
+  });
+
+  test('starvation sets causeOfDeath', () => {
+    state.player.food = 1;
+    state.player.hp = 1;
+    const { dx, dy } = findOpenNeighbour(state);
+    movePlayer(state, dx, dy);
+    expect(state.causeOfDeath).toBe('starvation');
+    expect(state.dead).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hunger — eatFood
+// ---------------------------------------------------------------------------
+
+describe('hunger — eatFood', () => {
+  let state;
+  beforeEach(() => { state = createGame({ seed: 1 }); state.monsters = []; });
+
+  function giveFood(name) {
+    const item = { type: 'food', name };
+    state.player.inventory.push(item);
+    return item;
+  }
+
+  test('food ration restores full satiety', () => {
+    state.player.food = 0;
+    eatFood(state, giveFood('food ration'));
+    expect(state.player.food).toBe(1300);
+  });
+
+  test('slime mold restores full satiety', () => {
+    state.player.food = 0;
+    eatFood(state, giveFood('slime mold'));
+    expect(state.player.food).toBe(1300);
+  });
+
+  test('eating restores some HP', () => {
+    state.player.hp = 1;
+    eatFood(state, giveFood('food ration'));
+    expect(state.player.hp).toBeGreaterThan(1);
   });
 });

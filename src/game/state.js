@@ -17,6 +17,30 @@ import { createMonster, monstersForLevel, MONSTER_TABLE } from './monster.js';
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 1;
 
+/** Maximum food the player can carry. */
+const FOOD_MAX = 1300;
+
+/** Hunger thresholds in descending order; each fires a message when crossed. */
+const HUNGER_THRESHOLDS = [
+  { food: 900, msg: 'You are getting hungry' },
+  { food: 400, msg: 'You are very hungry' },
+  { food: 150, msg: 'You are famished!' },
+  { food:  20, msg: 'You are starving!' },
+];
+
+/**
+ * Return the hunger label for a food value, or '' when well-fed.
+ * @param {number} food
+ * @returns {string}
+ */
+export function hungerLabel(food) {
+  if (food <=  20) return 'Starving';
+  if (food <= 150) return 'Famished';
+  if (food <= 400) return 'Very Hungry';
+  if (food <= 900) return 'Hungry';
+  return '';
+}
+
 /**
  * Return the effective FOV radius for the player.
  * Blindness reduces it to 0; otherwise returns SIGHT_RADIUS.
@@ -413,8 +437,10 @@ export function eatFood(state, item) {
   const idx = state.player.inventory.indexOf(item);
   if (idx === -1) return;
   state.player.inventory.splice(idx, 1);
-  const restored = Math.floor(Math.random() * 8) + 1;
-  state.player.hp = Math.min(state.player.maxHp, state.player.hp + restored);
+  const { player } = state;
+  const hpRestored = Math.floor(Math.random() * 8) + 1;
+  player.hp = Math.min(player.maxHp, player.hp + hpRestored);
+  player.food = FOOD_MAX;
   const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
   state.messages = [`You eat ${article} ${item.name}`];
 }
@@ -589,6 +615,28 @@ function regenHp(state) {
   if (state.dead || player.hp >= player.maxHp) return;
   const rate = REGEN_RATES[player.xpLevel];
   if (state.turn % rate === 0) player.hp += 1;
+}
+
+/**
+ * Decrement the player's food counter once per turn (half rate with slow
+ * digestion ring). Pushes threshold messages when each level is crossed.
+ * Deals 1 HP starvation damage when food reaches 0.
+ * @param {GameState} state
+ */
+function tickHunger(state) {
+  if (state.dead) return;
+  const { player } = state;
+  const slowDigestion = player.equippedRings.some(r => r?.name === 'ring of slow digestion');
+  if (slowDigestion && state.turn % 2 !== 0) return;
+  if (player.food > 0) player.food--;
+  for (const t of HUNGER_THRESHOLDS) {
+    if (player.food === t.food) state.messages.push(t.msg);
+  }
+  if (player.food === 0) {
+    player.hp -= 1;
+    if (player.hp <= 0) state.causeOfDeath = 'starvation';
+    handleDeath(state);
+  }
 }
 
 /**
@@ -841,6 +889,7 @@ export function zapWand(state, wand, dx, dy) {
   stepMonsters(state);
   handleDeath(state);
   regenHp(state);
+  tickHunger(state);
 }
 
 export function movePlayer(state, dx, dy) {
@@ -930,4 +979,5 @@ export function movePlayer(state, dx, dy) {
   stepMonsters(state);
   handleDeath(state);
   regenHp(state);
+  tickHunger(state);
 }

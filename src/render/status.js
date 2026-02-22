@@ -6,9 +6,11 @@
  *   [message — left][stats — right-justified, compact]
  *
  * Stats block is compact (no fixed width); fields are separated by two spaces.
- * Rank is omitted when empty (initial rank). The block is right-justified so
- * it always ends at column 79, with the message filling the remaining space.
+ * Rank is omitted when empty (initial rank). Hunger label omitted when well-fed.
+ * The block is right-justified so it always ends at column 79.
  */
+
+import { hungerLabel } from '../game/state.js';
 
 /** Total display width. */
 const COLS = 80;
@@ -24,6 +26,7 @@ function formatStats(state) {
   const parts = [
     `HP:${player.hp}/${player.maxHp}`,
     player.rank,
+    hungerLabel(player.food),
     `Au:${player.gold}`,
   ].filter(s => s);
   return parts.join('  ');
