@@ -38,6 +38,7 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon, equippedR
   if (item.type === 'potion') hints.push('q: quaff');
   if (item.type === 'scroll') hints.push('r: read');
   if (item.type === 'ring')   hints.push(equippedRings?.includes(item) ? 'p: remove' : 'p: put on');
+  if (item.type === 'wand')   hints.push('z: zap');
   const isEquippedRing = item.type === 'ring' && equippedRings?.includes(item);
   const canDrop = item !== equippedArmor && item !== equippedWeapon && !isEquippedRing;
   if (canDrop) hints.push('d: drop');

@@ -6,7 +6,7 @@
 
 import blessed from 'blessed';
 import { createScreen } from './render/screen.js';
-import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing } from './game/index.js';
+import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing, zapWand } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
@@ -36,8 +36,11 @@ const terminalBox = blessed.box({
 screen.append(statusBox);
 screen.append(terminalBox); // appended last so it renders on top
 
-/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' */
+/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' | 'ring' | 'zap' */
 let screenState = 'terminal';
+
+/** Wand selected for zapping; set when entering 'zap' state. */
+let pendingWand = null;
 
 /** Cursor position in the inventory screen. */
 let inventoryIdx = 0;
@@ -197,6 +200,12 @@ screen.on('keypress', (_ch, key) => {
       terminalBox.hide();
       afterTurn();
       return;
+    } else if (_ch === 'z' && item?.type === 'wand') {
+      pendingWand = item;
+      screenState = 'zap';
+      terminalBox.hide();
+      renderGame('Zap which direction? (arrow keys, Esc to cancel)', false);
+      return;
     } else if (_ch === 'p' && item?.type === 'ring') {
       const slot = state.player.equippedRings.indexOf(item);
       if (slot !== -1) {
@@ -212,6 +221,22 @@ screen.on('keypress', (_ch, key) => {
     }
     renderInventory(terminalBox, inv, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings);
     screen.render();
+    return;
+  }
+
+  if (screenState === 'zap') {
+    if (keyName === 'escape') {
+      screenState = 'game';
+      renderGame('', false);
+      return;
+    }
+    const delta = getMoveDelta(keyName);
+    if (delta) {
+      zapWand(state, pendingWand, delta.dx, delta.dy);
+      pendingWand = null;
+      screenState = 'game';
+      afterTurn();
+    }
     return;
   }
 

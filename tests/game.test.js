@@ -23,8 +23,10 @@ import {
   putOnRing,
   removeRing,
   applyEffect,
+  zapWand,
   SIGHT_RADIUS,
 } from '../src/game/state.js';
+import { createWand } from '../src/game/item.js';
 import { TILE } from '../src/dungeon/tiles.js';
 import { findRoomContaining } from '../src/dungeon/room.js';
 
@@ -1345,5 +1347,164 @@ describe('quaffPotion — confusion', () => {
     state.player.inventory.push(p);
     quaffPotion(state, p);
     expect(state.messages[0]).toMatch(/confused/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// zapWand
+// ---------------------------------------------------------------------------
+
+describe('zapWand', () => {
+  const HOBGOBLIN = MONSTER_TABLE.find(m => m.name === 'Hobgoblin');
+  let state, wand, monster;
+
+  /** Place a monster directly ahead of the player (right) on a floor tile. */
+  function placeMonsterRight(dist = 2) {
+    const m = createMonster(HOBGOBLIN, state.player.x + dist, state.player.y);
+    for (let x = state.player.x + 1; x <= m.x; x++)
+      state.dungeon.map[m.y][x] = { type: TILE.FLOOR, visible: true, visited: false, alwaysVisible: false };
+    state.monsters = [m];
+    return m;
+  }
+
+  beforeEach(() => {
+    state = createGame({ seed: 1 });
+    state.monsters = [];
+    wand = createWand('magic missile', 5);
+    state.player.inventory.push(wand);
+    monster = placeMonsterRight();
+  });
+
+  // --- charges ---
+
+  test('zapping consumes one charge', () => {
+    zapWand(state, wand, 1, 0);
+    expect(wand.charges).toBe(4);
+  });
+
+  test('empty wand does not fire and does not consume a charge', () => {
+    wand.charges = 0;
+    zapWand(state, wand, 1, 0);
+    expect(wand.charges).toBe(0);
+    expect(state.messages[0]).toMatch(/empty/i);
+  });
+
+  test('wand not in inventory does nothing', () => {
+    state.player.inventory = [];
+    zapWand(state, wand, 1, 0);
+    expect(wand.charges).toBe(5);
+  });
+
+  // --- targeting ---
+
+  test('magic missile hits a monster in line and reduces HP', () => {
+    const hpBefore = monster.hp;
+    zapWand(state, wand, 1, 0);
+    expect(monster.hp).toBeLessThan(hpBefore);
+  });
+
+  test('zap in empty direction pushes a miss message', () => {
+    state.monsters = []; // clear the line
+    zapWand(state, wand, 1, 0);
+    expect(state.messages.some(m => /harmlessly/i.test(m))).toBe(true);
+  });
+
+  test('zap does not hit a monster behind a wall', () => {
+    // Put a wall between player and monster
+    state.dungeon.map[monster.y][state.player.x + 1] = { type: TILE.WALL, visible: false, visited: false, alwaysVisible: false };
+    const hpBefore = monster.hp;
+    zapWand(state, wand, 1, 0);
+    expect(monster.hp).toBe(hpBefore);
+  });
+
+  // --- turn advancement ---
+
+  test('zapping advances the turn counter', () => {
+    zapWand(state, wand, 1, 0);
+    expect(state.turn).toBe(1);
+  });
+
+  // --- wand of light ---
+
+  test('wand of light illuminates a room regardless of direction', () => {
+    const lightWand = createWand('light', 3);
+    state.player.inventory.push(lightWand);
+    // Place player inside a dark room by finding a room and marking it unlit
+    const room = state.dungeon.rooms[0];
+    room.illuminated = false;
+    zapWand(state, lightWand, 0, 1); // direction irrelevant
+    expect(state.messages.some(m => /light/i.test(m))).toBe(true);
+  });
+
+  // --- drain life ---
+
+  test('wand of drain life halves monster HP', () => {
+    const drainWand = createWand('drain life', 3);
+    state.player.inventory.push(drainWand);
+    monster.hp = 20;
+    zapWand(state, drainWand, 1, 0);
+    expect(monster.hp).toBe(10);
+  });
+
+  test('drain life leaves at least 1 HP', () => {
+    const drainWand = createWand('drain life', 3);
+    state.player.inventory.push(drainWand);
+    monster.hp = 1;
+    zapWand(state, drainWand, 1, 0);
+    expect(monster.hp).toBe(1);
+  });
+
+  // --- slow monster ---
+
+  test('wand of slow monster applies confusion to target', () => {
+    const slowWand = createWand('slow monster', 3);
+    state.player.inventory.push(slowWand);
+    zapWand(state, slowWand, 1, 0);
+    expect(monster.statusEffects.confusion).toBe(19); // 20 applied, then stepMonsters decrements once
+  });
+
+  // --- teleport away ---
+
+  test('wand of teleport away moves the monster from its position', () => {
+    const teleWand = createWand('teleport away', 3);
+    state.player.inventory.push(teleWand);
+    const origX = monster.x;
+    const origY = monster.y;
+    zapWand(state, teleWand, 1, 0);
+    expect(monster.x !== origX || monster.y !== origY).toBe(true);
+  });
+
+  // --- cancellation ---
+
+  test('wand of cancellation resets monster aggression to 0', () => {
+    const cancelWand = createWand('cancellation', 3);
+    state.player.inventory.push(cancelWand);
+    monster.aggression = 3;
+    monster.provoked = true;
+    zapWand(state, cancelWand, 1, 0);
+    expect(monster.aggression).toBe(0);
+    expect(monster.provoked).toBe(false);
+  });
+
+  // --- polymorph ---
+
+  test('wand of polymorph replaces the monster in state.monsters', () => {
+    const polyWand = createWand('polymorph', 3);
+    state.player.inventory.push(polyWand);
+    zapWand(state, polyWand, 1, 0);
+    expect(state.monsters.includes(monster)).toBe(false);
+    expect(state.monsters.length).toBe(1);
+  });
+
+  // --- kill XP ---
+
+  test('killing a monster with a wand awards XP', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.99); // max damage
+    wand.charges = 5;
+    monster.hp = 1;
+    const xpBefore = state.player.xp;
+    zapWand(state, wand, 1, 0);
+    jest.restoreAllMocks();
+    expect(state.player.xp).toBeGreaterThan(xpBefore);
   });
 });

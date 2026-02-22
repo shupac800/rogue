@@ -12,7 +12,7 @@ import { createPlayer, xpToLevel, RANKS, REGEN_RATES, HP_PER_RANK, XP_THRESHOLDS
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
 import { generateDungeonItem } from './item.js';
-import { createMonster, monstersForLevel } from './monster.js';
+import { createMonster, monstersForLevel, MONSTER_TABLE } from './monster.js';
 
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 1;
@@ -690,6 +690,159 @@ export function readScroll(state, item) {
  * @param {number} dy - Row delta (-1, 0, or 1).
  * @returns {void}
  */
+
+/**
+ * Walk from the player in direction (dx, dy) and return the first living
+ * monster encountered before hitting a wall or map edge. Returns null if
+ * the path is clear.
+ * @param {GameState} state
+ * @param {number} dx
+ * @param {number} dy
+ * @returns {import('./monster.js').Monster|null}
+ */
+function findMonsterInLine(state, dx, dy) {
+  const { dungeon: { map }, player, monsters } = state;
+  let x = player.x + dx;
+  let y = player.y + dy;
+  while (y >= 0 && y < map.length && x >= 0 && x < map[0].length) {
+    if (!isWalkable(map[y][x].type)) break;
+    const m = monsters.find(m => m.hp > 0 && m.x === x && m.y === y);
+    if (m) return m;
+    x += dx;
+    y += dy;
+  }
+  return null;
+}
+
+/**
+ * Return a random walkable map position, or null if none exists.
+ * @param {GameState} state
+ * @returns {{ x: number, y: number }|null}
+ */
+function randomWalkablePos(state) {
+  const { dungeon: { map } } = state;
+  const candidates = [];
+  for (let y = 0; y < map.length; y++)
+    for (let x = 0; x < map[y].length; x++)
+      if (isWalkable(map[y][x].type)) candidates.push({ x, y });
+  return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
+}
+
+/**
+ * Apply a single wand effect to a target monster.
+ * Mutates state.messages and target; may replace entry in state.monsters.
+ * @param {GameState} state
+ * @param {import('./monster.js').Monster} target
+ * @param {string} effect
+ */
+function applyWandEffect(state, target, effect) {
+  const { player } = state;
+  switch (effect) {
+    case 'magic missile': {
+      const dmg = 6 + Math.floor(Math.random() * 6);
+      target.hp -= dmg;
+      state.messages.push(`The missile strikes the ${target.name}!`);
+      break;
+    }
+    case 'fire': {
+      const dmg = 8 + Math.floor(Math.random() * 8);
+      target.hp -= dmg;
+      state.messages.push(`A bolt of fire engulfs the ${target.name}!`);
+      break;
+    }
+    case 'cold': {
+      const dmg = 6 + Math.floor(Math.random() * 8);
+      target.hp -= dmg;
+      state.messages.push(`A blast of cold hits the ${target.name}!`);
+      break;
+    }
+    case 'lightning': {
+      const dmg = 12 + Math.floor(Math.random() * 8);
+      target.hp -= dmg;
+      state.messages.push(`A bolt of lightning strikes the ${target.name}!`);
+      break;
+    }
+    case 'drain life':
+      target.hp = Math.max(1, Math.floor(target.hp / 2));
+      state.messages.push(`The ${target.name} looks weaker`);
+      break;
+    case 'teleport away': {
+      const pos = randomWalkablePos(state);
+      if (pos) { target.x = pos.x; target.y = pos.y; }
+      state.messages.push(`The ${target.name} vanishes!`);
+      break;
+    }
+    case 'slow monster':
+      applyEffect(target, 'confusion', 20);
+      state.messages.push(`The ${target.name} slows down`);
+      break;
+    case 'polymorph': {
+      const template = MONSTER_TABLE[Math.floor(Math.random() * MONSTER_TABLE.length)];
+      const replacement = createMonster(template, target.x, target.y);
+      const ti = state.monsters.indexOf(target);
+      if (ti !== -1) state.monsters[ti] = replacement;
+      state.messages.push(`The ${target.name} transforms!`);
+      return; // replacement is not target; skip kill check
+    }
+    case 'cancellation':
+      target.statusEffects = { paralysis: 0, confusion: 0 };
+      target.aggression = 0;
+      target.provoked = false;
+      state.messages.push(`The ${target.name} looks subdued`);
+      break;
+    default:
+      state.messages.push('Nothing happens');
+  }
+  if (target.hp <= 0) {
+    player.xp += target.xp;
+    const prevLevel = player.xpLevel;
+    const newLevel = xpToLevel(player.xp);
+    state.messages.push(`You have defeated the ${target.name}`);
+    if (newLevel > prevLevel) {
+      promotePlayer(player, prevLevel, newLevel);
+      state.messages.push(`You have earned the rank of ${player.rank}`);
+    }
+  }
+}
+
+/**
+ * Zap a wand from the player's inventory in direction (dx, dy).
+ * Consumes one charge, fires a beam, and advances the turn.
+ * No-op if the wand is not in inventory or has no charges.
+ * @param {GameState} state
+ * @param {import('./item.js').WandItem} wand
+ * @param {number} dx
+ * @param {number} dy
+ */
+export function zapWand(state, wand, dx, dy) {
+  if (!state.player.inventory.includes(wand)) return;
+  if (wand.charges <= 0) {
+    state.messages = ['The wand is empty'];
+    return;
+  }
+  wand.charges--;
+  state.messages = [];
+  const effect = wand.name.replace(/^wand of /, '');
+  if (effect === 'light') {
+    illuminateRoomAt(state.dungeon.map, state.dungeon.rooms, state.player.x, state.player.y);
+    state.messages.push('The room floods with light');
+  } else {
+    const target = findMonsterInLine(state, dx, dy);
+    if (target) {
+      applyWandEffect(state, target, effect);
+    } else {
+      state.messages.push('The wand zaps harmlessly into the darkness');
+    }
+  }
+  state.monsters = state.monsters.filter(m => m.hp > 0);
+  state.turn += 1;
+  tickPlayerEffects(state);
+  computeFov(state.dungeon.map, state.player, fovRadius(state.player));
+  stepMonsters(state);
+  handleDeath(state);
+  regenHp(state);
+}
+
 export function movePlayer(state, dx, dy) {
   const { dungeon, player, monsters } = state;
   const { map } = dungeon;
