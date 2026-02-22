@@ -4,5 +4,5 @@
  */
 
 export { createPlayer } from './player.js';
-export { createGame, movePlayer, isWalkable, SIGHT_RADIUS, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing, zapWand, applyEffect, hungerLabel } from './state.js';
+export { createGame, movePlayer, isWalkable, SIGHT_RADIUS, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing, zapWand, applyEffect, hungerLabel, computeThrowPath, resolveThrow } from './state.js';
 export { createMonster } from './monster.js';

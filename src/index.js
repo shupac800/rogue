@@ -6,7 +6,7 @@
 
 import blessed from 'blessed';
 import { createScreen } from './render/screen.js';
-import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing, zapWand } from './game/index.js';
+import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, unwieldWeapon, eatFood, quaffPotion, readScroll, descendStairs, ascendStairs, cheatRankUp, putOnRing, removeRing, zapWand, computeThrowPath, resolveThrow } from './game/index.js';
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
@@ -36,11 +36,17 @@ const terminalBox = blessed.box({
 screen.append(statusBox);
 screen.append(terminalBox); // appended last so it renders on top
 
-/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' | 'ring' | 'zap' */
+/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' | 'ring' | 'zap' | 'throw' */
 let screenState = 'terminal';
 
 /** Wand selected for zapping; set when entering 'zap' state. */
 let pendingWand = null;
+
+/** True when the inventory screen is open for throw-item selection. */
+let throwMode = false;
+
+/** Item selected for throwing; set after throw-mode inventory selection. */
+let pendingThrowItem = null;
 
 /** Cursor position in the inventory screen. */
 let inventoryIdx = 0;
@@ -60,6 +66,41 @@ let terminalInput = '';
 
 /** Game state — null until startGame() is called. */
 let state = null;
+
+/** True while a throw animation is in progress; blocks keypress handling. */
+let animating = false;
+
+/** Missile glyph for each item type, shown during throw animation. */
+const MISSILE_CHAR = { food: '*', potion: '!', scroll: '?', weapon: ')', armor: ']', ring: '=', wand: '/' };
+/** Packed attribute: bold white fg, black bg. */
+const MISSILE_ATTR = (1 << 18) | (7 << 9) | 0;
+
+/**
+ * Animate a thrown missile along path, one cell per frame (~60 ms each).
+ * Renders the map normally each frame, then overlays the missile glyph.
+ * Calls onDone() after the last frame.
+ * @param {Array<{x:number,y:number}>} path
+ * @param {import('./game/item.js').Item} item
+ * @param {() => void} onDone
+ */
+function animateMissile(path, item, onDone) {
+  const ch = MISSILE_CHAR[item.type] ?? '*';
+  let i = 0;
+  function step() {
+    if (i >= path.length) { onDone(); return; }
+    const { x, y } = path[i];
+    renderMap(screen, state.dungeon, state.player, state.monsters, state.goldItems, state.dungeonItems);
+    if (screen.lines[y] && screen.lines[y][x] !== undefined) {
+      screen.lines[y][x] = [MISSILE_ATTR, ch];
+      screen.lines[y].dirty = true;
+    }
+    renderStatus(statusBox, state, '', false);
+    screen.render();
+    i++;
+    setTimeout(step, 60);
+  }
+  step();
+}
 
 /**
  * Messages from the current turn not yet displayed.
@@ -144,6 +185,7 @@ function handleTerminalKey(ch, key) {
 }
 
 screen.on('keypress', (_ch, key) => {
+  if (animating) return;
   const keyName = key?.name ?? _ch;
 
   if (screenState === 'terminal') {
@@ -155,9 +197,27 @@ screen.on('keypress', (_ch, key) => {
     const inv = state.player.inventory;
     const item = inv[inventoryIdx];
     if (keyName === 'escape') {
+      throwMode = false;
       screenState = 'game';
       terminalBox.hide();
       renderGame('', false);
+      return;
+    }
+    if (throwMode) {
+      if (keyName === 'up' || keyName === 'k') {
+        inventoryIdx = Math.max(0, inventoryIdx - 1);
+      } else if (keyName === 'down' || keyName === 'j') {
+        inventoryIdx = Math.min(inv.length - 1, inventoryIdx + 1);
+      } else if ((keyName === 'return' || keyName === 'enter') && item) {
+        pendingThrowItem = item;
+        throwMode = false;
+        screenState = 'throw';
+        terminalBox.hide();
+        renderGame('Throw which direction? ↑→↓← Esc to cancel', false);
+        return;
+      }
+      renderInventory(terminalBox, inv, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings, true);
+      screen.render();
       return;
     }
     if (keyName === 'up' || keyName === 'k') {
@@ -236,6 +296,30 @@ screen.on('keypress', (_ch, key) => {
       pendingWand = null;
       screenState = 'game';
       afterTurn();
+    }
+    return;
+  }
+
+  if (screenState === 'throw') {
+    if (keyName === 'escape') {
+      pendingThrowItem = null;
+      screenState = 'game';
+      renderGame('', false);
+      return;
+    }
+    const dirMap = { up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 } };
+    const dir = keyName && dirMap[keyName];
+    if (dir) {
+      const item = pendingThrowItem;
+      pendingThrowItem = null;
+      screenState = 'game';
+      const { path, hitMonster, landPos } = computeThrowPath(state, item, dir.dx, dir.dy);
+      animating = true;
+      animateMissile(path, item, () => {
+        resolveThrow(state, item, hitMonster, landPos);
+        animating = false;
+        afterTurn();
+      });
     }
     return;
   }
@@ -370,10 +454,21 @@ screen.on('keypress', (_ch, key) => {
   }
 
   if (keyName === 'i') {
+    throwMode = false;
     inventoryIdx = 0;
     screenState = 'inventory';
     terminalBox.show();
-    renderInventory(terminalBox, state.player.inventory, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings);
+    renderInventory(terminalBox, state.player.inventory, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings, false);
+    screen.render();
+    return;
+  }
+
+  if (_ch === 't') {
+    throwMode = true;
+    inventoryIdx = 0;
+    screenState = 'inventory';
+    terminalBox.show();
+    renderInventory(terminalBox, state.player.inventory, state.player.equippedArmor, state.player.equippedWeapon, inventoryIdx, state.player.equippedRings, true);
     screen.render();
     return;
   }

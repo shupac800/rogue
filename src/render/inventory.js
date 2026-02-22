@@ -59,8 +59,9 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon, equippedR
  * @param {import('../game/item.js').WeaponItem|null} equippedWeapon
  * @param {number} selectedIdx
  * @param {[import('../game/item.js').RingItem|null, import('../game/item.js').RingItem|null]} [equippedRings]
+ * @param {boolean} [throwMode=false] - When true, suppress item actions and show throw hint.
  */
-export function renderInventory(box, inventory, equippedArmor, equippedWeapon, selectedIdx, equippedRings) {
+export function renderInventory(box, inventory, equippedArmor, equippedWeapon, selectedIdx, equippedRings, throwMode = false) {
   const title = 'Inventory';
   const rings = equippedRings ?? [null, null];
   const itemLines = inventory.length === 0
@@ -75,7 +76,9 @@ export function renderInventory(box, inventory, equippedArmor, equippedWeapon, s
         return `${cursor} ${detail}${worn}${wielded}${left}${right}`;
       });
 
-  const hints = getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon, rings);
+  const hints = throwMode
+    ? 'Enter: throw this item    Esc: cancel'
+    : getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon, rings);
   const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ to navigate', hints];
   const W = Math.max(...block.map(l => l.length));
   const hPad = ' '.repeat(Math.max(0, Math.floor((COLS - W) / 2)));

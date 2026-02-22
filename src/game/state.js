@@ -17,6 +17,16 @@ import { createMonster, monstersForLevel, MONSTER_TABLE } from './monster.js';
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
 export const SIGHT_RADIUS = 1;
 
+/**
+ * Return the indefinite article ('a' or 'an') for a noun phrase.
+ * @param {string} noun
+ * @returns {'a'|'an'}
+ */
+function article(noun) { return /^[aeiou]/i.test(noun) ? 'an' : 'a'; }
+
+/** Maximum range (in map cells) for player-thrown missiles. */
+export const MAX_MISSILE_RANGE = 8;
+
 /** Maximum food the player can carry. */
 const FOOD_MAX = 1300;
 
@@ -197,8 +207,7 @@ function pickupDungeonItem(state, x, y) {
   const { item } = state.dungeonItems[idx];
   state.player.inventory.push(item);
   state.dungeonItems.splice(idx, 1);
-  const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
-  state.messages.push(`You pick up ${article} ${item.name}`);
+  state.messages.push(`You pick up ${article(item.name)} ${item.name}`);
 }
 
 /**
@@ -423,8 +432,7 @@ export function dropItem(state, item) {
   }
   state.player.inventory.splice(idx, 1);
   state.dungeonItems.push({ x, y, item });
-  const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
-  state.messages = [`You drop ${article} ${item.name}`];
+  state.messages = [`You drop ${article(item.name)} ${item.name}`];
 }
 
 /**
@@ -441,8 +449,7 @@ export function eatFood(state, item) {
   const hpRestored = Math.floor(Math.random() * 8) + 1;
   player.hp = Math.min(player.maxHp, player.hp + hpRestored);
   player.food = FOOD_MAX;
-  const article = /^[aeiou]/i.test(item.name) ? 'an' : 'a';
-  state.messages = [`You eat ${article} ${item.name}`];
+  state.messages = [`You eat ${article(item.name)} ${item.name}`];
 }
 
 /**
@@ -685,6 +692,7 @@ export function readScroll(state, item) {
         computeFov(dungeon.map, player, fovRadius(player));
         illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
       }
+      applyEffect(player, 'confusion', 5);
       state.messages = ['You feel dizzy and reappear elsewhere'];
       break;
     }
@@ -851,6 +859,143 @@ function applyWandEffect(state, target, effect) {
       state.messages.push(`You have earned the rank of ${player.rank}`);
     }
   }
+}
+
+/**
+ * Apply the thrown-potion effect to a target monster.
+ * @param {GameState} state
+ * @param {import('./monster.js').Monster} target
+ * @param {string} effect
+ */
+function applyPotionToMonster(state, target, effect) {
+  switch (effect) {
+    case 'healing':
+      target.hp = Math.min(target.maxHp, target.hp + 8);
+      state.messages.push(`The ${target.name} looks healthier`);
+      break;
+    case 'extra healing':
+      target.hp = target.maxHp;
+      state.messages.push(`The ${target.name} looks much healthier`);
+      break;
+    case 'poison':
+      target.hp -= 8 + Math.floor(Math.random() * 8);
+      state.messages.push(`The ${target.name} looks very sick`);
+      break;
+    case 'confusion':
+      applyEffect(target, 'confusion', 15);
+      state.messages.push(`The ${target.name} looks confused`);
+      break;
+    case 'paralysis':
+      applyEffect(target, 'paralysis', 15);
+      state.messages.push(`The ${target.name} freezes!`);
+      break;
+    case 'blindness':
+      applyEffect(target, 'confusion', 25);
+      state.messages.push(`The ${target.name} stumbles about`);
+      break;
+    default:
+      state.messages.push(`The potion shatters harmlessly`);
+  }
+}
+
+/**
+ * Compute the trajectory of a thrown item without mutating game state.
+ * Potions always hit; all other items hit on a 75% roll (25% miss chance).
+ * @param {GameState} state
+ * @param {import('./item.js').Item} item
+ * @param {number} dx
+ * @param {number} dy
+ * @returns {{ path: Array<{x:number,y:number}>, hitMonster: import('./monster.js').Monster|null, landPos: {x:number,y:number}|null }}
+ */
+export function computeThrowPath(state, item, dx, dy) {
+  const { dungeon: { map }, player, monsters } = state;
+  const path = [];
+  let cx = player.x + dx;
+  let cy = player.y + dy;
+  let hitMonster = null;
+  let landPos = null;
+
+  while (path.length < MAX_MISSILE_RANGE &&
+         cy >= 0 && cy < map.length && cx >= 0 && cx < map[0].length &&
+         isWalkable(map[cy][cx].type)) {
+    path.push({ x: cx, y: cy });
+    const m = monsters.find(m => m.hp > 0 && m.x === cx && m.y === cy);
+    if (m) {
+      const hit = item.type === 'potion' || Math.random() >= 0.25;
+      if (hit) { hitMonster = m; break; }
+    }
+    landPos = { x: cx, y: cy };
+    cx += dx;
+    cy += dy;
+  }
+
+  return { path, hitMonster, landPos };
+}
+
+/**
+ * Resolve a throw after animation: removes item from inventory, applies
+ * damage or effect to hitMonster (or places item at landPos), then advances
+ * the turn exactly like movePlayer does.
+ * @param {GameState} state
+ * @param {import('./item.js').Item} item
+ * @param {import('./monster.js').Monster|null} hitMonster
+ * @param {{x:number,y:number}|null} landPos
+ */
+export function resolveThrow(state, item, hitMonster, landPos) {
+  const { player } = state;
+  const idx = player.inventory.indexOf(item);
+  if (idx !== -1) player.inventory.splice(idx, 1);
+  if (item === player.equippedWeapon) { player.equippedWeapon = null; recomputeWeapon(player); }
+  if (item === player.equippedArmor)  { player.equippedArmor  = null; recomputeDefense(player); }
+  const ringSlot = player.equippedRings.indexOf(item);
+  if (ringSlot !== -1) {
+    player.equippedRings[ringSlot] = null;
+    recomputeRings(player); recomputeDefense(player); recomputeWeapon(player);
+  }
+
+  state.messages = [];
+
+  if (hitMonster) {
+    hitMonster.provoked = true;
+    if (item.type === 'weapon') {
+      const maxRaw = player.attack * 4;
+      const baseRaw = 1 + Math.floor(Math.random() * maxRaw);
+      const damage = Math.max(1, baseRaw - hitMonster.defense + item.damageBonus);
+      const tier = Math.min(3, Math.floor((baseRaw - 1) / Math.max(1, player.attack)));
+      hitMonster.hp -= damage;
+      state.messages.push(PLAYER_HIT_MSGS[tier](hitMonster.name));
+    } else if (item.type === 'potion') {
+      applyPotionToMonster(state, hitMonster, item.name.replace(/^potion of /, ''));
+    } else {
+      state.messages.push(`The ${item.name} bounces off the ${hitMonster.name}`);
+    }
+    if (hitMonster.hp <= 0) {
+      player.xp += hitMonster.xp;
+      const prevLevel = player.xpLevel;
+      const newLevel = xpToLevel(player.xp);
+      state.messages.push(`You have defeated the ${hitMonster.name}`);
+      if (hitMonster.name === 'leprechaun') {
+        const amount = 100 + Math.floor(Math.random() * 150);
+        state.goldItems.push({ x: hitMonster.x, y: hitMonster.y, amount });
+      }
+      if (newLevel > prevLevel) {
+        promotePlayer(player, prevLevel, newLevel);
+        state.messages.push(`You have earned the rank of ${player.rank}`);
+      }
+    }
+  } else {
+    if (landPos) state.dungeonItems.push({ x: landPos.x, y: landPos.y, item });
+    state.messages.push(`The ${item.name} hits the floor`);
+  }
+
+  state.monsters = state.monsters.filter(m => m.hp > 0);
+  state.turn += 1;
+  tickPlayerEffects(state);
+  computeFov(state.dungeon.map, player, fovRadius(player));
+  stepMonsters(state);
+  handleDeath(state);
+  regenHp(state);
+  tickHunger(state);
 }
 
 /**
