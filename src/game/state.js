@@ -628,6 +628,9 @@ function regenHp(state) {
   if (state.dead || player.hp >= player.maxHp) return;
   const rate = REGEN_RATES[player.xpLevel];
   if (state.turn % rate === 0) player.hp += 1;
+  if (player.hp < player.maxHp && player.equippedRings.some(r => r?.name === 'ring of regeneration')) {
+    player.hp += 1;
+  }
 }
 
 /**
