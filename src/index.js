@@ -10,7 +10,7 @@ import { createGame, movePlayer, wearArmor, removeArmor, dropItem, wieldWeapon, 
 import { renderMap } from './render/map.js';
 import { renderStatus } from './render/status.js';
 import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/terminal.js';
-import { renderInventory } from './render/inventory.js';
+import { renderInventory, buildDisplayGroups } from './render/inventory.js';
 import { renderArmorSelect } from './render/armor-select.js';
 import { renderRingSelect } from './render/ring-select.js';
 import { renderHeroes } from './render/heroes.js';
@@ -232,7 +232,8 @@ screen.on('keypress', (_ch, key) => {
 
   if (screenState === 'inventory') {
     const inv = state.player.inventory;
-    const item = inv[inventoryIdx];
+    const groups = buildDisplayGroups(inv);
+    const item = groups[inventoryIdx]?.item;
     if (keyName === 'escape') {
       throwMode = false;
       screenState = 'game';
@@ -244,7 +245,7 @@ screen.on('keypress', (_ch, key) => {
       if (keyName === 'up' || keyName === 'k') {
         inventoryIdx = Math.max(0, inventoryIdx - 1);
       } else if (keyName === 'down' || keyName === 'j') {
-        inventoryIdx = Math.min(inv.length - 1, inventoryIdx + 1);
+        inventoryIdx = Math.min(groups.length - 1, inventoryIdx + 1);
       } else if ((keyName === 'return' || keyName === 'enter') && item) {
         pendingThrowItem = item;
         throwMode = false;
@@ -260,7 +261,7 @@ screen.on('keypress', (_ch, key) => {
     if (keyName === 'up' || keyName === 'k') {
       inventoryIdx = Math.max(0, inventoryIdx - 1);
     } else if (keyName === 'down' || keyName === 'j') {
-      inventoryIdx = Math.min(inv.length - 1, inventoryIdx + 1);
+      inventoryIdx = Math.min(groups.length - 1, inventoryIdx + 1);
     } else if (_ch === 'd' && item && item !== state.player.equippedArmor && item !== state.player.equippedWeapon) {
       dropItem(state, item);
       screenState = 'game';

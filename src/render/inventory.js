@@ -47,28 +47,52 @@ export function getInventoryHints(item, equippedArmor, equippedWeapon, equippedR
 }
 
 /**
+ * Group inventory items by name, stacking identical items.
+ * @param {import('../game/item.js').Item[]} inventory
+ * @returns {Array<{item: import('../game/item.js').Item, count: number}>}
+ */
+export function buildDisplayGroups(inventory) {
+  const groups = [];
+  const nameToIdx = new Map();
+  for (const item of inventory) {
+    if (nameToIdx.has(item.name)) {
+      groups[nameToIdx.get(item.name)].count++;
+    } else {
+      nameToIdx.set(item.name, groups.length);
+      groups.push({ item, count: 1 });
+    }
+  }
+  return groups;
+}
+
+/**
  * Render the inventory list into the given box.
- * Items are labelled a), b), c)…  Equipped armor is marked [worn],
- * wielded weapon is marked [wielded], equipped rings are marked [left]/[right].
- * A '>' cursor marks the currently highlighted item.
+ * Identical items are stacked on one line with a count prefix (e.g. "2 arrows").
+ * Equipped armor is marked [worn], wielded weapon is marked [wielded],
+ * equipped rings are marked [left]/[right].
+ * A '>' cursor marks the currently highlighted display group.
  * The block is centered vertically; each line is indented to center the
  * widest entry horizontally.
  * @param {import('blessed').Widgets.BoxElement} box
  * @param {import('../game/item.js').Item[]} inventory
  * @param {import('../game/item.js').ArmorItem|null} equippedArmor
  * @param {import('../game/item.js').WeaponItem|null} equippedWeapon
- * @param {number} selectedIdx
+ * @param {number} selectedIdx - Index into display groups (not raw inventory).
  * @param {[import('../game/item.js').RingItem|null, import('../game/item.js').RingItem|null]} [equippedRings]
  * @param {boolean} [throwMode=false] - When true, suppress item actions and show throw hint.
  */
 export function renderInventory(box, inventory, equippedArmor, equippedWeapon, selectedIdx, equippedRings, throwMode = false) {
   const title = 'Inventory';
   const rings = equippedRings ?? [null, null];
-  const itemLines = inventory.length === 0
+  const groups = buildDisplayGroups(inventory);
+  const itemLines = groups.length === 0
     ? ['  (nothing)']
-    : inventory.map((item, i) => {
+    : groups.map(({ item, count }, i) => {
         const cursor  = i === selectedIdx ? '>' : ' ';
-        const detail  = formatItem(item);
+        const rawDetail = formatItem(item);
+        const detail  = count > 1
+          ? `${count} ${rawDetail.endsWith('s') ? rawDetail : rawDetail + 's'}`
+          : rawDetail;
         const worn    = item === equippedArmor  ? ' [worn]'    : '';
         const wielded = item === equippedWeapon ? ' [wielded]' : '';
         const left    = rings[0] === item ? ' [left]'  : '';
@@ -78,7 +102,7 @@ export function renderInventory(box, inventory, equippedArmor, equippedWeapon, s
 
   const hints = throwMode
     ? 'Enter: throw this item    Esc: cancel'
-    : getInventoryHints(inventory[selectedIdx], equippedArmor, equippedWeapon, rings);
+    : getInventoryHints(groups[selectedIdx]?.item, equippedArmor, equippedWeapon, rings);
   const block = [title, '-'.repeat(title.length), '', ...itemLines, '', '↑↓ to navigate', hints];
   const W = Math.max(...block.map(l => l.length));
   const hPad = ' '.repeat(Math.max(0, Math.floor((COLS - W) / 2)));

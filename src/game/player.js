@@ -89,6 +89,7 @@ export function xpToLevel(xp) {
  */
 export function createPlayer(x, y) {
   const sword = createWeapon('sword', 1, 1);
+  const shortBow = createWeapon('short bow', 1, 1);
   const leatherArmor = createArmor('leather armor', 3);
   return {
     x,
@@ -118,6 +119,8 @@ export function createPlayer(x, y) {
     inventory: [
       sword,
       leatherArmor,
+      shortBow,
+      ...Array.from({ length: 15 + Math.floor(Math.random() * 11) }, () => createWeapon('arrow', 0, 0)),
       createFood('food ration'),
     ],
   };

@@ -62,13 +62,15 @@ describe('player starting inventory', () => {
     expect(Array.isArray(player.inventory)).toBe(true);
   });
 
-  test('player starts with exactly three items', () => {
-    expect(player.inventory.length).toBe(3);
+  test('player starts with between 19 and 29 items (15–25 arrows + 4 others)', () => {
+    expect(player.inventory.length).toBeGreaterThanOrEqual(19);
+    expect(player.inventory.length).toBeLessThanOrEqual(29);
   });
 
   test('first item is the +1/+1 sword', () => {
     const sword = player.inventory[0];
     expect(sword.type).toBe('weapon');
+    expect(sword.name).toBe('+1/+1 sword');
     expect(sword.hitBonus).toBe(1);
     expect(sword.damageBonus).toBe(1);
   });
@@ -80,8 +82,21 @@ describe('player starting inventory', () => {
     expect(armor.ac).toBe(3);
   });
 
-  test('third item is a food ration', () => {
-    const food = player.inventory[2];
+  test('third item is a +1/+1 short bow', () => {
+    const bow = player.inventory[2];
+    expect(bow.type).toBe('weapon');
+    expect(bow.name).toBe('+1/+1 short bow');
+  });
+
+  test('items 4 through second-to-last are all arrows (15–25)', () => {
+    const arrows = player.inventory.slice(3, -1);
+    expect(arrows.length).toBeGreaterThanOrEqual(15);
+    expect(arrows.length).toBeLessThanOrEqual(25);
+    for (const a of arrows) expect(a.name).toBe('arrow');
+  });
+
+  test('last item is a food ration', () => {
+    const food = player.inventory[player.inventory.length - 1];
     expect(food.type).toBe('food');
     expect(food.name).toBe('food ration');
   });
