@@ -27,6 +27,7 @@ export function resetVisibility(map) {
   for (const row of map) {
     for (const cell of row) {
       if (!cell.alwaysVisible) cell.visible = false;
+      cell.fov = false;
     }
   }
 }
@@ -43,6 +44,7 @@ export function markVisible(map, x, y) {
   if (x < 0 || x >= map[0].length) return;
   map[y][x].visible = true;
   map[y][x].visited = true;
+  map[y][x].fov = true;
 }
 
 /**

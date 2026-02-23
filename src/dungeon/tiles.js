@@ -39,8 +39,10 @@ export const TILE_CHAR = Object.freeze({
  * alwaysVisible: set true for permanently lit tiles (illuminated rooms);
  * resetVisibility will leave these cells visible every turn.
  * @param {number} type - One of the TILE values.
- * @returns {{ type: number, visible: boolean, visited: boolean, alwaysVisible: boolean }}
+ * fov: true only during the current FOV computation; reset every turn regardless
+ * of alwaysVisible. Use fov (not visible) to decide whether live entities are seen.
+ * @returns {{ type: number, visible: boolean, visited: boolean, alwaysVisible: boolean, fov: boolean }}
  */
 export function makeCell(type) {
-  return { type, visible: false, visited: false, alwaysVisible: false };
+  return { type, visible: false, visited: false, alwaysVisible: false, fov: false };
 }

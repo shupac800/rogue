@@ -163,12 +163,12 @@ export function renderMap(screen, dungeon, player, monsters, goldItems, dungeonI
       if (screen.lines[y][x] === undefined) continue;
       const cell = map[y][x];
       const isPlayer = x === player.x && y === player.y;
-      const monsterChar = !isPlayer && cell.visible ? monsterMap.get(`${x},${y}`) : undefined;
+      const monsterChar = !isPlayer && cell.fov ? monsterMap.get(`${x},${y}`) : undefined;
       if (monsterChar !== undefined) {
         screen.lines[y][x] = [ATTR.MONSTER, monsterChar];
-      } else if (!isPlayer && cell.visible && goldSet.has(`${x},${y}`)) {
+      } else if (!isPlayer && cell.fov && goldSet.has(`${x},${y}`)) {
         screen.lines[y][x] = [ATTR.GOLD, '$'];
-      } else if (!isPlayer && cell.visible && itemMap.has(`${x},${y}`)) {
+      } else if (!isPlayer && cell.fov && itemMap.has(`${x},${y}`)) {
         const { ch, attr } = itemMap.get(`${x},${y}`);
         screen.lines[y][x] = [attr, ch];
       } else {
