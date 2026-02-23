@@ -23,8 +23,12 @@ const COLS = 80;
  */
 function formatStats(state) {
   const { player } = state;
+  const st = player.strength < player.maxStrength
+    ? `St:${player.strength}/${player.maxStrength}`
+    : `St:${player.strength}`;
   const parts = [
     `HP:${player.hp}/${player.maxHp}`,
+    st,
     player.rank,
     hungerLabel(player.food),
     `Au:${player.gold}`,

@@ -289,23 +289,36 @@ function handleDeath(state) {
 }
 
 /**
+ * Recompute player.attack from strength and ring strength bonus.
+ * Formula: max(1, strength + ringStrengthBonus - 13).
+ * @param {import('./player.js').Player} player
+ */
+function recomputeAttack(player) {
+  player.attack = Math.max(1, player.strength + player.ringStrengthBonus - 13);
+}
+
+/**
  * Recompute ring bonus fields from all equipped rings.
  * Effects: 'protection' → +1 ringDefenseBonus, 'increase damage' → +1 ringDamageBonus,
- * 'dexterity' → +1 ringHitBonus. All other rings are stubs (no stat change).
+ * 'dexterity' → +1 ringHitBonus, 'add strength' → +1 ringStrengthBonus.
+ * All other rings are stubs (no stat change).
  * @param {import('./player.js').Player} player
  */
 function recomputeRings(player) {
-  let defense = 0, damage = 0, hit = 0;
+  let defense = 0, damage = 0, hit = 0, strength = 0;
   for (const ring of player.equippedRings) {
     if (!ring) continue;
     const effect = ring.name.replace(/^ring of /, '');
-    if (effect === 'protection')       defense += 1;
-    else if (effect === 'increase damage') damage += 1;
-    else if (effect === 'dexterity')   hit    += 1;
+    if (effect === 'protection')           defense  += 1;
+    else if (effect === 'increase damage') damage   += 1;
+    else if (effect === 'dexterity')       hit      += 1;
+    else if (effect === 'add strength')    strength += 1;
   }
-  player.ringDefenseBonus = defense;
-  player.ringDamageBonus  = damage;
-  player.ringHitBonus     = hit;
+  player.ringDefenseBonus  = defense;
+  player.ringDamageBonus   = damage;
+  player.ringHitBonus      = hit;
+  player.ringStrengthBonus = strength;
+  recomputeAttack(player);
 }
 
 /**
@@ -488,16 +501,29 @@ export function quaffPotion(state, item) {
       player.hp = player.maxHp;
       state.messages = ['You feel much better'];
       break;
-    case 'poison':
+    case 'poison': {
+      const sustained = player.equippedRings?.some(r => r?.name === 'ring of sustain strength');
+      if (sustained) {
+        state.messages = ['You feel sick, but your strength is sustained'];
+      } else {
+        const loss = Math.floor(Math.random() * 3) + 1;
+        player.strength = Math.max(1, player.strength - loss);
+        recomputeAttack(player);
+        state.messages = ['You feel your strength draining away'];
+      }
       player.hp -= Math.floor(Math.random() * 8) + 1;
-      state.messages = ['You feel very sick'];
       handleDeath(state);
       break;
+    }
     case 'gain strength':
-      player.attack += 1;
+      player.strength += 1;
+      player.maxStrength = Math.max(player.maxStrength, player.strength);
+      recomputeAttack(player);
       state.messages = ['You feel stronger'];
       break;
     case 'restore strength':
+      player.strength = player.maxStrength;
+      recomputeAttack(player);
       state.messages = ['You feel yourself again'];
       break;
     case 'raise level': {

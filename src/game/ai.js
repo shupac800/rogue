@@ -6,6 +6,7 @@
 import { TILE } from '../dungeon/tiles.js';
 import { createMonster, monstersForLevel } from './monster.js';
 import { resolveCombat } from './combat.js';
+import { RANKS, XP_THRESHOLDS, HP_PER_RANK } from './player.js';
 
 /** Chebyshev distance at which aggression-1 monsters begin pursuing. */
 const MONSTER_SIGHT = 8;
@@ -64,6 +65,111 @@ export function spawnMonsters(dungeon, rng, dungeonLevel = 1) {
  * @param {object} state
  * @param {() => number} rng
  */
+/**
+ * Apply the special on-hit effect for monsters that have one.
+ * Pushes relevant messages onto state.messages.
+ * @param {import('./monster.js').Monster} m
+ * @param {import('./player.js').Player} player
+ * @param {object} state
+ * @param {() => number} rng
+ */
+function applySpecialAttack(m, player, state, rng) {
+  switch (m.name) {
+    case 'aquator': {
+      if (player.equippedArmor) {
+        player.equippedArmor.ac = Math.max(0, player.equippedArmor.ac - 1);
+        player.defense = player.baseDefense + player.equippedArmor.ac + player.ringDefenseBonus;
+        state.messages.push('Your armor corrodes!');
+      } else {
+        state.messages.push('The aquator splashes you harmlessly');
+      }
+      break;
+    }
+    case 'ice monster': {
+      if (player.statusEffects.paralysis > 0) {
+        // already frozen — no effect
+      } else if (rng() < 0.30) {
+        player.statusEffects.paralysis = 2;
+        state.messages.push('You are frozen solid!');
+      }
+      break;
+    }
+    case 'nymph': {
+      if (player.inventory.length > 0) {
+        const idx = Math.floor(rng() * player.inventory.length);
+        const stolen = player.inventory.splice(idx, 1)[0];
+        if (stolen === player.equippedWeapon) {
+          player.equippedWeapon = null;
+          player.hitBonus    = player.ringHitBonus;
+          player.damageBonus = player.ringDamageBonus;
+        }
+        if (stolen === player.equippedArmor) {
+          player.equippedArmor = null;
+          player.defense = player.baseDefense + player.ringDefenseBonus;
+        }
+        const ri = player.equippedRings.indexOf(stolen);
+        if (ri !== -1) {
+          player.equippedRings[ri] = null;
+          let def = 0, dmg = 0, hit = 0;
+          for (const r of player.equippedRings) {
+            if (!r) continue;
+            const e = r.name.replace(/^ring of /, '');
+            if (e === 'protection')      def++;
+            else if (e === 'increase damage') dmg++;
+            else if (e === 'dexterity') hit++;
+          }
+          player.ringDefenseBonus = def;
+          player.ringDamageBonus  = dmg;
+          player.ringHitBonus     = hit;
+          player.defense    = player.baseDefense + (player.equippedArmor?.ac ?? 0) + def;
+          player.hitBonus   = (player.equippedWeapon?.hitBonus    ?? 0) + hit;
+          player.damageBonus= (player.equippedWeapon?.damageBonus ?? 0) + dmg;
+        }
+        state.messages.push(`The nymph steals your ${stolen.name} and vanishes!`);
+      } else {
+        state.messages.push('The nymph finds nothing to steal and vanishes!');
+      }
+      m.hp = 0;
+      break;
+    }
+    case 'rattlesnake': {
+      if (rng() < 0.5) break; // dry bite — no venom
+      const sustained = player.equippedRings?.some(r => r?.name === 'ring of sustain strength');
+      if (sustained) {
+        state.messages.push('The rattlesnake\'s venom is neutralized by your ring!');
+      } else {
+        player.strength = Math.max(1, player.strength - 1);
+        player.attack = Math.max(1, player.strength + (player.ringStrengthBonus ?? 0) - 13);
+        state.messages.push('You are envenom\'d and feel weaker!');
+      }
+      break;
+    }
+    case 'vampire': {
+      if (player.maxHp > 1) {
+        player.maxHp--;
+        if (player.hp > player.maxHp) player.hp = player.maxHp;
+        state.messages.push('The vampire drains your life force!');
+      }
+      break;
+    }
+    case 'wraith': {
+      if (player.xpLevel > 0) {
+        const drained = player.xpLevel;
+        player.xpLevel--;
+        player.rank  = RANKS[player.xpLevel];
+        player.xp    = XP_THRESHOLDS[player.xpLevel];
+        player.maxHp = Math.max(1, player.maxHp - HP_PER_RANK[drained]);
+        if (player.hp > player.maxHp) player.hp = player.maxHp;
+        state.messages.push('The wraith drains your experience!');
+      }
+      break;
+    }
+  }
+}
+
+/** Set of monster names whose attacks are purely special (no physical damage). */
+const SPECIAL_ONLY = new Set(['aquator', 'nymph']);
+
 function pursuePlayer(m, player, map, monsters, state, rng) {
   const dx = Math.sign(player.x - m.x);
   const dy = Math.sign(player.y - m.y);
@@ -86,12 +192,24 @@ function pursuePlayer(m, player, map, monsters, state, rng) {
         }
         return;
       }
+      if (SPECIAL_ONLY.has(m.name)) {
+        // No physical damage — just a hit/miss roll then special effect.
+        if (rng() >= 0.25) {
+          applySpecialAttack(m, player, state, rng);
+        } else {
+          (state.messages ??= []).push(`The ${m.name} misses`);
+        }
+        return;
+      }
       const result = resolveCombat(m, player, rng);
       const msg = result.hit ? `The ${m.name} hits you` : `The ${m.name} misses`;
       (state.messages ??= []).push(msg);
-      if (result.hit && player.hp <= 0) {
-        const article = /^[aeiou]/i.test(m.name) ? 'an' : 'a';
-        state.causeOfDeath = `${article} ${m.name}`;
+      if (result.hit) {
+        applySpecialAttack(m, player, state, rng);
+        if (player.hp <= 0) {
+          const article = /^[aeiou]/i.test(m.name) ? 'an' : 'a';
+          state.causeOfDeath = `${article} ${m.name}`;
+        }
       }
       return;
     }
