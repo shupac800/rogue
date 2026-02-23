@@ -24,6 +24,15 @@ export const SIGHT_RADIUS = 1;
  */
 function article(noun) { return /^[aeiou]/i.test(noun) ? 'an' : 'a'; }
 
+/**
+ * Return a noun phrase for an item: bare name for armor, 'a/an name' otherwise.
+ * @param {import('./item.js').Item} item
+ * @returns {string}
+ */
+function itemRef(item) {
+  return item.type === 'armor' ? item.name : `${article(item.name)} ${item.name}`;
+}
+
 /** Maximum range (in map cells) for player-thrown missiles. */
 export const MAX_MISSILE_RANGE = 11;
 
@@ -88,6 +97,7 @@ function tickPlayerEffects(state) {
   if (e.paralysis > 0 && --e.paralysis === 0) state.messages.push('You can move again');
   if (e.confusion > 0 && --e.confusion === 0) state.messages.push('You feel less confused');
   if (e.blindness  > 0 && --e.blindness  === 0) state.messages.push('Your vision returns');
+  if (e.haste      > 0 && --e.haste      === 0) state.messages.push('You slow down');
 }
 
 /** Player-attack message for each hit tier (0 = glancing, 3 = devastating). */
@@ -139,8 +149,8 @@ export function isWalkable(type) {
  */
 
 /**
- * Place gold items in rooms. Each room has a 20% chance of containing one
- * pile. Amount scales with dungeonLevel: 2 to min(80, dungeonLevel * 16).
+ * Place gold items in rooms.
+ * Amount scales with dungeonLevel: 2 to min(80, dungeonLevel * 16).
  * Never places gold at the player's starting position (stairsUp).
  * @param {import('../dungeon/room.js').Room[]} rooms
  * @param {() => number} rng
@@ -151,7 +161,7 @@ export function isWalkable(type) {
 function placeGoldItems(rooms, rng, dungeonLevel, stairsUp) {
   const items = [];
   for (const room of rooms) {
-    if (rng() >= 0.25) continue;
+    if (rng() >= 0.25) continue; // 25% chance of gold in this room
     const x = room.x + Math.floor(rng() * room.width);
     const y = room.y + Math.floor(rng() * room.height);
     const maxAmount = Math.min(80, dungeonLevel * 16);
@@ -213,7 +223,7 @@ function pickupDungeonItem(state, x, y) {
   const { item } = state.dungeonItems[idx];
   state.player.inventory.push(item);
   state.dungeonItems.splice(idx, 1);
-  state.messages.push(`You pick up ${article(item.name)} ${item.name}`);
+  state.messages.push(`You pick up ${itemRef(item)}`);
 }
 
 /**
@@ -232,8 +242,7 @@ export function createGame(options = {}) {
   const goldItems = placeGoldItems(dungeon.rooms, monsterRng, dungeonLevel, dungeon.stairsUp);
   const dungeonItems = placeDungeonItems(dungeon.rooms, monsterRng, dungeon.stairsUp);
   const playerName = options.playerName ?? 'Adventurer';
-  const welcomeMessage = 'Welcome to the Dungeons of Doom';
-  const state = { dungeon, player, playerName, dungeonLevel, turn: 0, monsters, goldItems, dungeonItems, messages: [welcomeMessage, `Good luck ${playerName}!`], dead: false, causeOfDeath: null };
+  const state = { dungeon, player, playerName, dungeonLevel, turn: 0, monsters, goldItems, dungeonItems, messages: [`Good luck ${playerName}!`], dead: false, causeOfDeath: null };
   computeFov(dungeon.map, player, SIGHT_RADIUS);
   illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
   return state;
@@ -438,7 +447,7 @@ export function dropItem(state, item) {
   }
   state.player.inventory.splice(idx, 1);
   state.dungeonItems.push({ x, y, item });
-  state.messages = [`You drop ${article(item.name)} ${item.name}`];
+  state.messages = [`You drop ${itemRef(item)}`];
 }
 
 /**
@@ -455,7 +464,7 @@ export function eatFood(state, item) {
   const hpRestored = Math.floor(Math.random() * 8) + 1;
   player.hp = Math.min(player.maxHp, player.hp + hpRestored);
   player.food = FOOD_MAX;
-  state.messages = [`You eat ${article(item.name)} ${item.name}`];
+  state.messages = [`You eat ${itemRef(item)}`];
 }
 
 /**
@@ -501,6 +510,10 @@ export function quaffPotion(state, item) {
       }
       break;
     }
+    case 'haste self':
+      applyEffect(player, 'haste', 12);
+      state.messages = ['You feel yourself moving faster'];
+      break;
     case 'confusion':
       applyEffect(player, 'confusion', 15);
       state.messages = ['You feel confused'];

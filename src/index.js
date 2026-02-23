@@ -13,7 +13,9 @@ import { renderTerminal, renderTombstone, MAX_INPUT_LENGTH } from './render/term
 import { renderInventory } from './render/inventory.js';
 import { renderArmorSelect } from './render/armor-select.js';
 import { renderRingSelect } from './render/ring-select.js';
+import { renderHeroes } from './render/heroes.js';
 import { getMoveDelta } from './input/keys.js';
+import { loadHeroes, recordGame } from './game/heroes.js';
 
 const screen = createScreen();
 
@@ -36,8 +38,11 @@ const terminalBox = blessed.box({
 screen.append(statusBox);
 screen.append(terminalBox); // appended last so it renders on top
 
-/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' | 'ring' | 'zap' | 'throw' */
+/** Current screen state: 'terminal' | 'game' | 'inventory' | 'armor' | 'ring' | 'zap' | 'throw' | 'tombstone' | 'heroes' */
 let screenState = 'terminal';
+
+/** Where to return after the heroes screen: 'terminal' (post-death) or 'game' (H key). */
+let heroesReturnState = 'terminal';
 
 /** Wand selected for zapping; set when entering 'zap' state. */
 let pendingWand = null;
@@ -109,7 +114,7 @@ function animateMissile(path, item, onDone) {
  */
 let moreQueue = [];
 
-const TERMINAL_OUTPUT = ['Dungeons of Doom', ''];
+const TERMINAL_OUTPUT = ['Welcome to the Dungeons of Doom', ''];
 
 /** Render the terminal state. */
 function showTerminal() {
@@ -147,9 +152,19 @@ function afterTurn() {
  * Transition to terminal state and display the death tombstone.
  */
 function transitionToTombstone() {
-  screenState = 'terminal';
+  recordGame(state);
+  screenState = 'tombstone';
   terminalBox.show();
   renderTombstone(terminalBox, state.playerName, state.player.rank, state.causeOfDeath ?? 'unknown', state.dungeonLevel, state.player.gold);
+  screen.render();
+}
+
+/** Show the heroes screen, returning to returnTo when dismissed. */
+function showHeroes(returnTo) {
+  heroesReturnState = returnTo;
+  screenState = 'heroes';
+  terminalBox.show();
+  renderHeroes(terminalBox, loadHeroes());
   screen.render();
 }
 
@@ -187,6 +202,25 @@ function handleTerminalKey(ch, key) {
 screen.on('keypress', (_ch, key) => {
   if (animating) return;
   const keyName = key?.name ?? _ch;
+
+  if (screenState === 'tombstone') {
+    showHeroes('terminal');
+    return;
+  }
+
+  if (screenState === 'heroes') {
+    if (heroesReturnState === 'game') {
+      screenState = 'game';
+      terminalBox.hide();
+      afterTurn();
+    } else {
+      screenState = 'terminal';
+      state = null;
+      terminalInput = '';
+      showTerminal();
+    }
+    return;
+  }
 
   if (screenState === 'terminal') {
     handleTerminalKey(_ch, key);
@@ -491,6 +525,11 @@ screen.on('keypress', (_ch, key) => {
     terminalBox.show();
     renderRingSelect(terminalBox, currentRingItems, state.player.equippedRings, ringSelectIdx);
     screen.render();
+    return;
+  }
+
+  if (_ch === 'H') {
+    showHeroes('game');
     return;
   }
 

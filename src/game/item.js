@@ -34,7 +34,7 @@ const WEAPON_NAMES = ['mace', 'long sword', 'dagger', 'spear', 'short bow', 'two
 const ARMORS = [
   { name: 'leather armor',    ac: 3 },
   { name: 'ring mail',        ac: 4 },
-  { name: 'studded leather',  ac: 4 },
+  { name: 'studded leather armor',  ac: 4 },
   { name: 'scale mail',       ac: 5 },
   { name: 'chain mail',       ac: 6 },
   { name: 'splint mail',      ac: 7 },

@@ -168,6 +168,7 @@ function wanderStep(m, map, monsters, rng) {
  */
 export function stepMonsters(state, rng = Math.random) {
   const { dungeon: { map }, player, monsters } = state;
+  if (player.statusEffects?.haste > 0 && state.turn % 2 === 1) return;
   if (player.equippedRings?.some(r => r?.name === 'ring of aggravate monsters')) {
     for (const m of monsters) { if (m.hp > 0) m.provoked = true; }
   }
@@ -184,6 +185,8 @@ export function stepMonsters(state, rng = Math.random) {
       }
     }
     if (m.aggression === 0 && !m.provoked) continue;
+    const stealth = player.equippedRings?.some(r => r?.name === 'ring of stealth');
+    if (stealth && !m.provoked && m.aggression === 1) continue;
     const chebDist = Math.max(Math.abs(player.x - m.x), Math.abs(player.y - m.y));
     if (m.aggression !== 3 && chebDist > MONSTER_SIGHT) continue;
     if (m.aggression === 2 && chebDist > PURSUIT_SIGHT) {
