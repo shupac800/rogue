@@ -1018,7 +1018,14 @@ export function computeThrowPath(state, item, dx, dy) {
     path.push({ x: cx, y: cy });
     const m = monsters.find(m => m.hp > 0 && m.x === cx && m.y === cy);
     if (m) {
-      const hit = item.type === 'potion' || Math.random() >= 0.25;
+      let missChance = 0.25;
+      if (item.baseName === 'arrow') {
+        const bow = player.equippedWeapon;
+        if (bow && (bow.baseName === 'short bow' || bow.baseName === 'long bow')) {
+          missChance = Math.max(0, 0.25 - bow.hitBonus * 0.05);
+        }
+      }
+      const hit = item.type === 'potion' || Math.random() >= missChance;
       if (hit) { hitMonster = m; break; }
     }
     landPos = { x: cx, y: cy };
@@ -1055,12 +1062,28 @@ export function resolveThrow(state, item, hitMonster, landPos) {
   if (hitMonster) {
     hitMonster.provoked = true;
     if (item.type === 'weapon') {
-      const maxRaw = player.attack * 4;
-      const baseRaw = 1 + Math.floor(Math.random() * maxRaw);
-      const damage = Math.max(1, baseRaw - hitMonster.defense + item.damageBonus);
-      const tier = Math.min(3, Math.floor((baseRaw - 1) / Math.max(1, player.attack)));
-      hitMonster.hp -= damage;
-      state.messages.push(PLAYER_HIT_MSGS[tier](hitMonster.name));
+      let baseRaw, maxDmg, bowDamBonus = 0;
+      if (item.baseName === 'arrow') {
+        const bow = player.equippedWeapon;
+        if (bow && bow.baseName === 'short bow') {
+          maxDmg = 6; baseRaw = 1 + Math.floor(Math.random() * 6); bowDamBonus = bow.damageBonus;
+        } else if (bow && bow.baseName === 'long bow') {
+          maxDmg = 8; baseRaw = 3 + Math.floor(Math.random() * 6); bowDamBonus = bow.damageBonus;
+        } else {
+          maxDmg = 2; baseRaw = 1 + Math.floor(Math.random() * 2);
+        }
+        const damage = Math.max(1, baseRaw + bowDamBonus - hitMonster.defense);
+        const tier = Math.min(3, Math.floor(baseRaw * 4 / (maxDmg + 1)));
+        hitMonster.hp -= damage;
+        state.messages.push(PLAYER_HIT_MSGS[tier](hitMonster.name));
+      } else {
+        const maxRaw = player.attack * 4;
+        baseRaw = 1 + Math.floor(Math.random() * maxRaw);
+        const damage = Math.max(1, baseRaw - hitMonster.defense + item.damageBonus);
+        const tier = Math.min(3, Math.floor((baseRaw - 1) / Math.max(1, player.attack)));
+        hitMonster.hp -= damage;
+        state.messages.push(PLAYER_HIT_MSGS[tier](hitMonster.name));
+      }
     } else if (item.type === 'potion') {
       applyPotionToMonster(state, hitMonster, item.name.replace(/^potion of /, ''));
     } else {
