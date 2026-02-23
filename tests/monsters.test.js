@@ -175,17 +175,24 @@ describe('spawnMonsters', () => {
 
   beforeEach(() => { dungeon = generate({ seed: SEED }); });
 
-  test('spawns rooms-1 monsters (one per non-start room)', () => {
+  test('spawns one monster per room, skipping staircase rooms', () => {
     const monsters = spawnMonsters(dungeon, () => Math.random(), 1);
-    expect(monsters.length).toBe(dungeon.rooms.length - 1);
+    const { stairsUp, stairsDown, rooms } = dungeon;
+    const stairCells = new Set([`${stairsUp.x},${stairsUp.y}`, `${stairsDown.x},${stairsDown.y}`]);
+    const skipped = rooms.filter(r => {
+      const c = { x: r.x + Math.floor(r.width / 2), y: r.y + Math.floor(r.height / 2) };
+      return stairCells.has(`${c.x},${c.y}`);
+    }).length;
+    expect(monsters.length).toBe(rooms.length - skipped);
   });
 
-  test('no monster is placed at the stairsUp position', () => {
+  test('no monster is placed at a staircase position', () => {
     const monsters = spawnMonsters(dungeon, () => Math.random(), 1);
-    const atStart = monsters.some(
-      m => m.x === dungeon.stairsUp.x && m.y === dungeon.stairsUp.y
+    const atStairs = monsters.some(
+      m => (m.x === dungeon.stairsUp.x && m.y === dungeon.stairsUp.y) ||
+           (m.x === dungeon.stairsDown.x && m.y === dungeon.stairsDown.y)
     );
-    expect(atStart).toBe(false);
+    expect(atStairs).toBe(false);
   });
 
   test('each monster is placed on a floor-like tile', () => {
@@ -610,10 +617,10 @@ describe('leprechaun — gold theft', () => {
     expect(state.messages.some(m => m.includes('59') && m.includes('gold'))).toBe(true);
   });
 
-  test('hit message with 0 gold mentions nothing to steal', () => {
+  test('hit message with 0 gold: leprechaun vanishes', () => {
     const { state } = setup(0);
     stepMonsters(state, () => 0.99);
-    expect(state.messages.some(m => m.includes('nothing') || m.includes('Nothing'))).toBe(true);
+    expect(state.messages.some(m => m.includes('vanishes'))).toBe(true);
   });
 });
 

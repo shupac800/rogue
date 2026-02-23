@@ -5,11 +5,11 @@
  */
 
 /**
- * @typedef {{ type: 'weapon', name: string, hitBonus: number, damageBonus: number }} WeaponItem
+ * @typedef {{ type: 'weapon', name: string, baseName: string, hitBonus: number, damageBonus: number }} WeaponItem
  * @typedef {{ type: 'food',   name: string }} FoodItem
  * @typedef {{ type: 'potion', name: string }} PotionItem
  * @typedef {{ type: 'scroll', name: string }} ScrollItem
- * @typedef {{ type: 'armor',  name: string, ac: number }} ArmorItem
+ * @typedef {{ type: 'armor',  name: string, baseName: string, ac: number, baseAc: number }} ArmorItem
  * @typedef {{ type: 'ring',   name: string }} RingItem
  * @typedef {{ type: 'wand',   name: string, charges: number }} WandItem
  * @typedef {WeaponItem|FoodItem|PotionItem|ScrollItem|ArmorItem|RingItem|WandItem} Item
@@ -65,8 +65,22 @@ function pick(arr, rng) { return arr[Math.floor(rng() * arr.length)]; }
  * @param {number} damageBonus - Bonus to damage dealt.
  * @returns {WeaponItem}
  */
+/**
+ * Build the display name for a weapon from its base name and bonuses.
+ * @param {string} baseName
+ * @param {number} hitBonus
+ * @param {number} damageBonus
+ * @returns {string}
+ */
+export function weaponDisplayName(baseName, hitBonus, damageBonus) {
+  if (hitBonus === 0 && damageBonus === 0) return baseName;
+  const h = hitBonus >= 0 ? `+${hitBonus}` : `${hitBonus}`;
+  const d = damageBonus >= 0 ? `+${damageBonus}` : `${damageBonus}`;
+  return `${h}/${d} ${baseName}`;
+}
+
 export function createWeapon(name, hitBonus, damageBonus) {
-  return { type: 'weapon', name, hitBonus, damageBonus };
+  return { type: 'weapon', baseName: name, name: weaponDisplayName(name, hitBonus, damageBonus), hitBonus, damageBonus };
 }
 
 /**
@@ -102,8 +116,22 @@ export function createScroll(title) {
  * @param {number} ac - Armor class value (higher = better protection).
  * @returns {ArmorItem}
  */
+/**
+ * Build the display name for armor from its base name and current AC vs base AC.
+ * @param {string} baseName
+ * @param {number} ac
+ * @param {number} baseAc
+ * @returns {string}
+ */
+export function armorDisplayName(baseName, ac, baseAc) {
+  const bonus = ac - baseAc;
+  if (bonus === 0) return baseName;
+  const b = bonus > 0 ? `+${bonus}` : `${bonus}`;
+  return `${b} ${baseName}`;
+}
+
 export function createArmor(name, ac) {
-  return { type: 'armor', name, ac };
+  return { type: 'armor', baseName: name, name: armorDisplayName(name, ac, ac), ac, baseAc: ac };
 }
 
 /**

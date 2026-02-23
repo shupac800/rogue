@@ -88,7 +88,7 @@ export function xpToLevel(xp) {
  * @returns {Player}
  */
 export function createPlayer(x, y) {
-  const sword = createWeapon('+1/+1 sword', 1, 1);
+  const sword = createWeapon('sword', 1, 1);
   const leatherArmor = createArmor('leather armor', 3);
   return {
     x,
@@ -101,8 +101,8 @@ export function createPlayer(x, y) {
     hitBonus: sword.hitBonus,
     damageBonus: sword.damageBonus,
     equippedWeapon: sword,
-    baseDefense: 1,
-    defense: 1 + leatherArmor.ac,
+    baseDefense: 0,
+    defense: leatherArmor.ac,
     equippedArmor: leatherArmor,
     equippedRings: [null, null],
     ringDefenseBonus: 0,

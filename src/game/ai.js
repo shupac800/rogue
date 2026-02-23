@@ -7,6 +7,7 @@ import { TILE } from '../dungeon/tiles.js';
 import { createMonster, monstersForLevel } from './monster.js';
 import { resolveCombat } from './combat.js';
 import { RANKS, XP_THRESHOLDS, HP_PER_RANK } from './player.js';
+import { armorDisplayName } from './item.js';
 
 /** Chebyshev distance at which aggression-1 monsters begin pursuing. */
 const MONSTER_SIGHT = 8;
@@ -48,7 +49,8 @@ export function spawnMonsters(dungeon, rng, dungeonLevel = 1) {
   const eligible = monstersForLevel(dungeonLevel);
   for (const room of dungeon.rooms) {
     const center = roomCenter(room);
-    if (center.x === dungeon.stairsUp.x && center.y === dungeon.stairsUp.y) continue;
+    if (center.x === dungeon.stairsUp.x   && center.y === dungeon.stairsUp.y)   continue;
+    if (center.x === dungeon.stairsDown.x && center.y === dungeon.stairsDown.y) continue;
     const template = eligible[Math.floor(rng() * eligible.length)];
     monsters.push(createMonster(template, center.x, center.y));
   }
@@ -77,7 +79,8 @@ function applySpecialAttack(m, player, state, rng) {
   switch (m.name) {
     case 'aquator': {
       if (player.equippedArmor) {
-        player.equippedArmor.ac = Math.max(0, player.equippedArmor.ac - 1);
+        player.equippedArmor.ac = Math.max(1, player.equippedArmor.ac - 1);
+        player.equippedArmor.name = armorDisplayName(player.equippedArmor.baseName, player.equippedArmor.ac, player.equippedArmor.baseAc);
         player.defense = player.baseDefense + player.equippedArmor.ac + player.ringDefenseBonus;
         state.messages.push('Your armor corrodes!');
       } else {
@@ -95,8 +98,10 @@ function applySpecialAttack(m, player, state, rng) {
       break;
     }
     case 'nymph': {
-      if (player.inventory.length > 0) {
-        const idx = Math.floor(rng() * player.inventory.length);
+      const stealable = player.inventory.filter(i => i !== player.equippedArmor);
+      if (stealable.length > 0) {
+        const target = stealable[Math.floor(rng() * stealable.length)];
+        const idx = player.inventory.indexOf(target);
         const stolen = player.inventory.splice(idx, 1)[0];
         if (stolen === player.equippedWeapon) {
           player.equippedWeapon = null;
@@ -125,9 +130,9 @@ function applySpecialAttack(m, player, state, rng) {
           player.hitBonus   = (player.equippedWeapon?.hitBonus    ?? 0) + hit;
           player.damageBonus= (player.equippedWeapon?.damageBonus ?? 0) + dmg;
         }
-        state.messages.push(`The nymph steals your ${stolen.name} and vanishes!`);
+        state.messages.push(`The nymph steals your ${stolen.name} and vanishes`);
       } else {
-        state.messages.push('The nymph finds nothing to steal and vanishes!');
+        state.messages.push('The nymph vanishes');
       }
       m.hp = 0;
       break;
@@ -136,7 +141,7 @@ function applySpecialAttack(m, player, state, rng) {
       if (rng() < 0.5) break; // dry bite — no venom
       const sustained = player.equippedRings?.some(r => r?.name === 'ring of sustain strength');
       if (sustained) {
-        state.messages.push('The rattlesnake\'s venom is neutralized by your ring!');
+        state.messages.push('The venom is neutralized by your ring!');
       } else {
         player.strength = Math.max(1, player.strength - 1);
         player.attack = Math.max(1, player.strength + (player.ringStrengthBonus ?? 0) - 13);
@@ -146,7 +151,7 @@ function applySpecialAttack(m, player, state, rng) {
     }
     case 'vampire': {
       if (player.maxHp > 1) {
-        player.maxHp--;
+        player.maxHp -= 2;
         if (player.hp > player.maxHp) player.hp = player.maxHp;
         state.messages.push('The vampire drains your life force!');
       }
@@ -185,8 +190,8 @@ function pursuePlayer(m, player, map, monsters, state, rng) {
           const stolen = Math.min(Math.floor(player.gold * (0.1 + rng() * 0.2)), 640);
           player.gold -= stolen;
           const msg = stolen > 0
-            ? `The leprechaun steals ${stolen} gold and vanishes!`
-            : 'The leprechaun finds nothing to steal and vanishes!';
+            ? `The leprechaun steals ${stolen} gold and vanishes`
+            : 'The leprechaun vanishes';
           (state.messages ??= []).push(msg);
           m.hp = 0;
         }

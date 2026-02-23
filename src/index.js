@@ -31,7 +31,7 @@ const statusBox = blessed.box({
 const terminalBox = blessed.box({
   top: 0, left: 0,
   width: 80, height: 24,
-  tags: false,
+  tags: true,
   style: { fg: 'white', bg: 'black' },
 });
 
@@ -151,8 +151,10 @@ function afterTurn() {
 /**
  * Transition to terminal state and display the death tombstone.
  */
+let heroesHighlightIdx = -1;
+
 function transitionToTombstone() {
-  recordGame(state);
+  ({ newIdx: heroesHighlightIdx } = recordGame(state));
   screenState = 'tombstone';
   terminalBox.show();
   renderTombstone(terminalBox, state.playerName, state.player.rank, state.causeOfDeath ?? 'unknown', state.dungeonLevel, state.player.gold);
@@ -164,7 +166,8 @@ function showHeroes(returnTo) {
   heroesReturnState = returnTo;
   screenState = 'heroes';
   terminalBox.show();
-  renderHeroes(terminalBox, loadHeroes());
+  renderHeroes(terminalBox, loadHeroes(), heroesHighlightIdx);
+  heroesHighlightIdx = -1;
   screen.render();
 }
 

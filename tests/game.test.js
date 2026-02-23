@@ -55,7 +55,7 @@ describe('createPlayer', () => {
     expect(p.hp).toBe(5);
     expect(p.maxHp).toBe(5);
     expect(p.attack).toBe(3);
-    expect(p.defense).toBe(4); // baseDefense 1 + leather armor AC 3
+    expect(p.defense).toBe(3); // baseDefense 0 + leather armor AC 3
     expect(p.gold).toBe(0);
     expect(p.xp).toBe(0);
     expect(p.xpLevel).toBe(0);
@@ -156,16 +156,16 @@ describe('createGame', () => {
     }
   });
 
-  test('gold item amounts respect DL1 maximum (≤ 16)', () => {
+  test('gold item amounts respect DL1 maximum (≤ 32)', () => {
     const many = [];
     for (let s = 0; s < 200; s++) many.push(...createGame({ seed: s }).goldItems);
-    for (const g of many) expect(g.amount).toBeLessThanOrEqual(16);
+    for (const g of many) expect(g.amount).toBeLessThanOrEqual(32);
   });
 
-  test('gold item amounts respect DL5 maximum (≤ 80)', () => {
+  test('gold item amounts respect DL5 maximum (≤ 160)', () => {
     const many = [];
     for (let s = 0; s < 200; s++) many.push(...createGame({ seed: s, dungeonLevel: 5 }).goldItems);
-    for (const g of many) expect(g.amount).toBeLessThanOrEqual(80);
+    for (const g of many) expect(g.amount).toBeLessThanOrEqual(160);
   });
 });
 

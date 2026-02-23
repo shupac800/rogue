@@ -11,7 +11,7 @@ import { findRoomContaining } from '../dungeon/room.js';
 import { createPlayer, xpToLevel, RANKS, REGEN_RATES, HP_PER_RANK, XP_THRESHOLDS } from './player.js';
 import { spawnMonsters, stepMonsters } from './ai.js';
 import { resolveCombat } from './combat.js';
-import { generateDungeonItem } from './item.js';
+import { generateDungeonItem, weaponDisplayName, armorDisplayName } from './item.js';
 import { createMonster, monstersForLevel, MONSTER_TABLE } from './monster.js';
 
 /** Maximum sight range in tiles. Used by FOV and accessible in tests. */
@@ -150,7 +150,7 @@ export function isWalkable(type) {
 
 /**
  * Place gold items in rooms.
- * Amount scales with dungeonLevel: 2 to min(80, dungeonLevel * 16).
+ * Amount scales with dungeonLevel: 4 to min(160, dungeonLevel * 32).
  * Never places gold at the player's starting position (stairsUp).
  * @param {import('../dungeon/room.js').Room[]} rooms
  * @param {() => number} rng
@@ -164,8 +164,8 @@ function placeGoldItems(rooms, rng, dungeonLevel, stairsUp) {
     if (rng() >= 0.25) continue; // 25% chance of gold in this room
     const x = room.x + Math.floor(rng() * room.width);
     const y = room.y + Math.floor(rng() * room.height);
-    const maxAmount = Math.min(80, dungeonLevel * 16);
-    const amount = 2 + Math.floor((rng() + rng() + rng()) / 3 * (maxAmount - 1));
+    const maxAmount = Math.min(160, dungeonLevel * 32);
+    const amount = 4 + Math.floor((rng() + rng() + rng()) / 3 * (maxAmount - 3));
     if (x === stairsUp.x && y === stairsUp.y) continue;
     items.push({ x, y, amount });
   }
@@ -512,6 +512,7 @@ export function quaffPotion(state, item) {
         state.messages = ['You feel your strength draining away'];
       }
       player.hp -= Math.floor(Math.random() * 8) + 1;
+      if (player.hp <= 0) state.causeOfDeath = 'poison';
       handleDeath(state);
       break;
     }
@@ -560,6 +561,21 @@ export function quaffPotion(state, item) {
 export function illuminateRoomAt(map, rooms, x, y) {
   const room = findRoomContaining(rooms, x, y);
   if (room?.illuminated) revealRoom(map, room);
+}
+
+/**
+ * Permanently illuminate and reveal the room at (x, y), even if it was dark.
+ * No-op when the point is outside all rooms.
+ * @param {Array} map
+ * @param {import('../dungeon/room.js').Room[]} rooms
+ * @param {number} x
+ * @param {number} y
+ */
+function lightRoomAt(map, rooms, x, y) {
+  const room = findRoomContaining(rooms, x, y);
+  if (!room) return;
+  room.illuminated = true;
+  revealRoom(map, room);
 }
 
 /**
@@ -731,6 +747,7 @@ export function readScroll(state, item) {
       if (!player.equippedWeapon) { state.messages = ['Nothing happens']; break; }
       player.equippedWeapon.hitBonus    += 1;
       player.equippedWeapon.damageBonus += 1;
+      player.equippedWeapon.name = weaponDisplayName(player.equippedWeapon.baseName, player.equippedWeapon.hitBonus, player.equippedWeapon.damageBonus);
       recomputeWeapon(player);
       state.messages = ['Your weapon glows blue'];
       break;
@@ -738,6 +755,7 @@ export function readScroll(state, item) {
     case 'enchant armor': {
       if (!player.equippedArmor) { state.messages = ['Nothing happens']; break; }
       player.equippedArmor.ac += 1;
+      player.equippedArmor.name = armorDisplayName(player.equippedArmor.baseName, player.equippedArmor.ac, player.equippedArmor.baseAc);
       recomputeDefense(player);
       state.messages = ['Your armor glows blue'];
       break;
@@ -766,7 +784,7 @@ export function readScroll(state, item) {
       break;
     }
     case 'light': {
-      illuminateRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
+      lightRoomAt(dungeon.map, dungeon.rooms, player.x, player.y);
       state.messages = ['The room floods with light'];
       break;
     }
@@ -1096,7 +1114,7 @@ export function zapWand(state, wand, dx, dy) {
   state.messages = [];
   const effect = wand.name.replace(/^wand of /, '');
   if (effect === 'light') {
-    illuminateRoomAt(state.dungeon.map, state.dungeon.rooms, state.player.x, state.player.y);
+    lightRoomAt(state.dungeon.map, state.dungeon.rooms, state.player.x, state.player.y);
     state.messages.push('The room floods with light');
   } else {
     const target = findMonsterInLine(state, dx, dy);

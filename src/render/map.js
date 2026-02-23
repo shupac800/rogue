@@ -157,18 +157,36 @@ export function renderMap(screen, dungeon, player, monsters, goldItems, dungeonI
     itemMap.set(`${x},${y}`, ITEM_RENDER[item.type]);
   }
 
+  // If the player is inside an illuminated room, entities anywhere in that
+  // room are visible even if outside the FOV radius.
+  // Find the illuminated room the player is inside, or adjacent to via a door.
+  const inRoom = (r, x, y) =>
+    x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height;
+  let litRoom = dungeon.rooms.find(r => r.illuminated && inRoom(r, player.x, player.y)) ?? null;
+  if (!litRoom && map[player.y]?.[player.x]?.type === TILE.DOOR) {
+    for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      litRoom = dungeon.rooms.find(r => r.illuminated && inRoom(r, player.x + dx, player.y + dy)) ?? null;
+      if (litRoom) break;
+    }
+  }
+
   for (let y = 0; y < height; y++) {
     if (!screen.lines[y]) continue;
     for (let x = 0; x < width; x++) {
       if (screen.lines[y][x] === undefined) continue;
       const cell = map[y][x];
       const isPlayer = x === player.x && y === player.y;
-      const monsterChar = !isPlayer && cell.fov ? monsterMap.get(`${x},${y}`) : undefined;
+      const inLitRoom = litRoom !== null &&
+        x >= litRoom.x && x < litRoom.x + litRoom.width &&
+        y >= litRoom.y && y < litRoom.y + litRoom.height;
+      const adjacent = Math.max(Math.abs(x - player.x), Math.abs(y - player.y)) <= 1;
+      const entityVisible = cell.fov || inLitRoom || adjacent;
+      const monsterChar = !isPlayer && entityVisible ? monsterMap.get(`${x},${y}`) : undefined;
       if (monsterChar !== undefined) {
         screen.lines[y][x] = [ATTR.MONSTER, monsterChar];
-      } else if (!isPlayer && cell.fov && goldSet.has(`${x},${y}`)) {
+      } else if (!isPlayer && entityVisible && goldSet.has(`${x},${y}`)) {
         screen.lines[y][x] = [ATTR.GOLD, '$'];
-      } else if (!isPlayer && cell.fov && itemMap.has(`${x},${y}`)) {
+      } else if (!isPlayer && entityVisible && itemMap.has(`${x},${y}`)) {
         const { ch, attr } = itemMap.get(`${x},${y}`);
         screen.lines[y][x] = [attr, ch];
       } else {

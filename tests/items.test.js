@@ -11,8 +11,9 @@ import { createPlayer } from '../src/game/player.js';
 
 describe('createWeapon', () => {
   test('has correct type and fields', () => {
-    const w = createWeapon('+1/+1 sword', 1, 1);
+    const w = createWeapon('sword', 1, 1);
     expect(w.type).toBe('weapon');
+    expect(w.baseName).toBe('sword');
     expect(w.name).toBe('+1/+1 sword');
     expect(w.hitBonus).toBe(1);
     expect(w.damageBonus).toBe(1);
@@ -90,8 +91,8 @@ describe('player starting inventory', () => {
   });
 
   test('player defense equals baseDefense + leather armor AC', () => {
-    expect(player.baseDefense).toBe(1);
-    expect(player.defense).toBe(4); // 1 + 3
+    expect(player.baseDefense).toBe(0);
+    expect(player.defense).toBe(3); // 0 + 3
   });
 
   test('player starts wielding the sword', () => {

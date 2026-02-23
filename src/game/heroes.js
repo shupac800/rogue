@@ -12,7 +12,7 @@ const HEROES_PATH = join(__dirname, '../../heroes.json');
 const MAX_HEROES = 10;
 
 /**
- * @typedef {{ date: string, playerName: string, obituary: string, dungeonLevel: number, gold: number }} HeroEntry
+ * @typedef {{ date: string, playerName: string, rank: string, obituary: string, dungeonLevel: number, gold: number }} HeroEntry
  */
 
 /**
@@ -47,10 +47,17 @@ export function loadHeroes() {
  * @param {import('./state.js').GameState} state
  * @returns {HeroEntry[]} Updated heroes list.
  */
+/**
+ * Record a completed game. Returns the updated list and the index of the new
+ * entry (-1 if it was pushed off the leaderboard).
+ * @param {import('./state.js').GameState} state
+ * @returns {{ heroes: HeroEntry[], newIdx: number }}
+ */
 export function recordGame(state) {
   const entry = {
     date:         new Date().toISOString().slice(0, 10),
     playerName:   state.playerName,
+    rank:         state.player.rank || '(novice)',
     obituary:     buildObituary(state),
     dungeonLevel: state.dungeonLevel,
     gold:         state.player.gold,
@@ -60,5 +67,6 @@ export function recordGame(state) {
   heroes.sort((a, b) => b.gold - a.gold || b.dungeonLevel - a.dungeonLevel);
   heroes.splice(MAX_HEROES);
   writeFileSync(HEROES_PATH, JSON.stringify(heroes, null, 2));
-  return heroes;
+  const newIdx = heroes.indexOf(entry);
+  return { heroes, newIdx };
 }

@@ -14,7 +14,7 @@ const ROWS = 24;
 export function formatItem(item) {
   if (item.type === 'weapon') {
     const s = n => (n >= 0 ? `+${n}` : `${n}`);
-    return `${item.name}  (${s(item.hitBonus)} hit, ${s(item.damageBonus)} dmg)`;
+    return `${item.name}`;
   }
   if (item.type === 'armor') return `${item.name}  [AC ${item.ac}]`;
   if (item.type === 'wand')  return `${item.name}  [${item.charges} charges]`;
